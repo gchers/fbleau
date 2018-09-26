@@ -22,48 +22,50 @@ For now, this tool:
   many estimates at the same time.
 
 
-## Compile
+## Install
 
-Get yourself `cargo` (maybe using `rustup`).
+Get yourself `cargo` (maybe using [`rustup`](https://rustup.rs/)).
 
 Run:
 
 ```
-git clone <this repo>
+git clone https://github.com/gchers/fbleau
 cd fbleau
 cargo install
 ```
 
 Now you can run the binary with `fbleau`.
 
+Note: I'll also put `fbleau` on https://crates.io, hopefully soon.
+
 ## Running
 
 `fbleau` accepts .csv files (for training and test data) of the following
 form:
 
-    y_1, x^1_1, x^2_1, ..., x^d_1
-    y_2, x^1_2, x^2_2, ..., x^d_2
+    y_1, x^1_1, ..., x^d_1
+    y_2, x^1_2, ..., x^d_2
     ...
 
-where $y_i$ is the label of the `i`-th object, and the object itself is
-a vector of `d` real numbers: `(x^1_i, x^2_i, ..., x^d_i)`.
+where `y_i` is the label of the `i`-th object, and the object itself is
+a vector of `d` real numbers: `(x^1_i, ..., x^d_i)`.
 
 ## TODO
 
 ### Short term
 
-[ ] return various leakage measures (instead of R*)
-[ ] resubstitution estimate
+- [ ] return various leakage measures (instead of R*)
+- [ ] resubstitution estimate
 
 ### Mid term
 
-[ ] predictions for multiple estimators at the same time
-[ ] get training data from standard input (on-line mode)
+- [ ] predictions for multiple estimators at the same time
+- [ ] get training data from standard input (on-line mode)
 
 ### Maybe
 
-[ ] other ML methods (e.g., SVM)
-[ ] Python and Java bindings
+- [ ] other ML methods (e.g., SVM)
+- [ ] Python and Java bindings
 
 
 ## Authors
@@ -72,6 +74,8 @@ Giovanni Cherubin (maintainer), Konstantinos Chatzikokolakis, Catuscia Palamides
 
 ## References
 
-[1] 2017, "Bayes, not Naïve: Security Bounds on Website Fingerprinting Defenses" _Giovanni Cherubin_
-[2] 2018, "F-BLEAU: Practical Channel Leakage Estimation" _Giovanni Cherubin, Konstantinos Chatzikokolakis, Catuscia Palamidessi_.
-[3] "Machine Learning methods for Quantifying the Security of Black-boxes", https://giocher.com/pages/bayes.html
+[1] 2017, "Bayes, not Naïve: Security Bounds on Website Fingerprinting Defenses". _Giovanni Cherubin_
+
+[2] 2018, "F-BLEAU: Practical Channel Leakage Estimation". _Giovanni Cherubin, Konstantinos Chatzikokolakis, Catuscia Palamidessi_.
+
+[3] "Machine Learning methods for Quantifying the Security of Black-boxes". https://giocher.com/pages/bayes.html
