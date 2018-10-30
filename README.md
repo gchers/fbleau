@@ -36,7 +36,7 @@ Install [rustup](https://rustup.rs) (and, consequently, `cargo`).
 Then run:
 
 ```
-git clone <this repo>
+git clone https://github.com/gchers/fbleau
 cd fbleau
 cargo install
 ```
@@ -47,6 +47,8 @@ check out [rustup](https://rustup.rs) again).
 *Note* If `rustup` is not available on your system (e.g., \*BSD systems),
 you should still be able to install `cargo` and compile `fbleau`
 as shown above.
+
+*Note* I'll also put `fbleau` on https://crates.io, hopefully soon.
 
 # Usage
 
@@ -67,23 +69,22 @@ Secrets must have discrete values (although this restriction can be
 lifted in the future), outputs may have either discrete or continuous
 values.
 
-
 ## TODO
 
 ### Short term
 
-[ ] return various leakage measures (instead of R*)
-[ ] resubstitution estimate
+- [ ] return various leakage measures (instead of R*)
+- [ ] resubstitution estimate
 
 ### Mid term
 
-[ ] predictions for multiple estimators at the same time
-[ ] get training data from standard input (on-line mode)
+- [ ] predictions for multiple estimators at the same time
+- [ ] get training data from standard input (on-line mode)
 
 ### Maybe
 
-[ ] other ML methods (e.g., SVM)
-[ ] Python and Java bindings
+- [ ] other ML methods (e.g., SVM)
+- [ ] Python and Java bindings
 
 
 # Authors
@@ -92,8 +93,8 @@ Giovanni Cherubin (maintainer), Konstantinos Chatzikokolakis, Catuscia Palamides
 
 # References
 
-[1] 2017, "Bayes, not Naïve: Security Bounds on Website Fingerprinting Defenses" _Giovanni Cherubin_
+[1] 2017, "Bayes, not Naïve: Security Bounds on Website Fingerprinting Defenses". _Giovanni Cherubin_
 
-[2] 2018, "F-BLEAU: Practical Channel Leakage Estimation" _Giovanni Cherubin, Konstantinos Chatzikokolakis, Catuscia Palamidessi_.
+[2] 2018, "F-BLEAU: Practical Channel Leakage Estimation". _Giovanni Cherubin, Konstantinos Chatzikokolakis, Catuscia Palamidessi_.
 
-[3] "Machine Learning methods for Quantifying the Security of Black-boxes", https://giocher.com/pages/bayes.html
+[3] "Machine Learning methods for Quantifying the Security of Black-boxes". https://giocher.com/pages/bayes.html
