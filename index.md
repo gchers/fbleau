@@ -1,32 +1,39 @@
 # F-BLEAU
 
 F-BLEAU is a tool for estimating the leakage of a system in a black-box manner
-(i.e., by only looking at its secret inputs and outputs) we proposed in [2].
+(i.e., by only looking at its secret inputs and outputs). It was proposed in [2].
+It considers a generic system as a black-box, taking secret inputs and returning
+outputs accordingly, and it measures how much the outputs "leak" about the
+inputs. This is done by only looking at observations of inputs and
+respective outputs.
 
-This tool is based on the equivalence between Machine Learning and black-box
-estimation of information leakage [1,2,3].
+F-BLEAU is based on the equivalence between estimating the error of a Machine
+Learning model of a specific class and the estimation of information leakage
+[1,2,3].
 
-This is also the code used for the experiments of [2] on the following
+This code was also used for the experiments of [2] on the following
 evaluations: Gowalla, e-passport, and side channel attack to finite field
 exponentiation.
 
+# Status
 
-## Status
-
-For now, this tool:
+Currently, the code provided here:
 - only estimates the Bayes risk (one has to derive the desired leakage measure
   from it manually),
 - is based on frequentist and nearest neighbor methods; in the future we hope
-  to extend this to other ML methods,
-- computes one estimate at the time; it is possible however to compute
-  many estimates at the same time.
+  to extend this to other ML methods; note that this does not affect the
+  generality of the results, which hold against any classifier,
+- computes one estimate at the time, which can be improved in the future.
 
+# Install
 
-## Install
+The code is written in Rust, but it is thought to be used as a
+stand-alone command line tool.
+Bindings to other programming languages (e.g., Python) may happen in the
+future.
 
-Get yourself `cargo` (maybe using [`rustup`](https://rustup.rs/)).
-
-Run:
+Install [rustup](https://rustup.rs) (and, consequently, `cargo`).
+Then run:
 
 ```
 git clone https://github.com/gchers/fbleau
@@ -34,21 +41,33 @@ cd fbleau
 cargo install
 ```
 
-Now you can run the binary with `fbleau`.
+You should now find the binary `fbleau` in your `$PATH` (if not,
+check out [rustup](https://rustup.rs) again).
 
-Note: I'll also put `fbleau` on https://crates.io, hopefully soon.
+*Note* If `rustup` is not available on your system (e.g., \*BSD systems),
+you should still be able to install `cargo` and compile `fbleau`
+as shown above.
 
-## Running
+*Note* I'll also put `fbleau` on https://crates.io, hopefully soon.
 
-`fbleau` accepts .csv files (for training and test data) of the following
-form:
+# Usage
 
-    y_1, x^1_1, ..., x^d_1
-    y_2, x^1_2, ..., x^d_2
-    ...
+*(Section under construction)*
 
-where `y_i` is the label of the `i`-th object, and the object itself is
-a vector of `d` real numbers: `(x^1_i, ..., x^d_i)`.
+`fbleau` accepts as input CSV files of the following form:
+
+```
+s_1, x^1_1, ..., x^d_1
+s_2, x^1_2, ..., x^d_2
+...
+```
+
+Each row represents an observation sampled from the black-box,
+where $s_i$ is the secret input given to the system, and
+$o^1_i, ..., o^d_i$ is the (vector) output of the system.
+Secrets must have discrete values (although this restriction can be
+lifted in the future), outputs may have either discrete or continuous
+values.
 
 ## TODO
 
@@ -68,11 +87,11 @@ a vector of `d` real numbers: `(x^1_i, ..., x^d_i)`.
 - [ ] Python and Java bindings
 
 
-## Authors
+# Authors
 
 Giovanni Cherubin (maintainer), Konstantinos Chatzikokolakis, Catuscia Palamidessi.
 
-## References
+# References
 
 [1] 2017, "Bayes, not Naïve: Security Bounds on Website Fingerprinting Defenses". _Giovanni Cherubin_
 
