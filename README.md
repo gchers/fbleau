@@ -15,20 +15,10 @@ This code was also used for the experiments of [2] on the following
 evaluations: Gowalla, e-passport, and side channel attack to finite field
 exponentiation.
 
-# Status
-
-Currently, the code provided here:
-- only estimates the Bayes risk (one has to derive the desired leakage measure
-  from it manually),
-- is based on frequentist and nearest neighbor methods; in the future we hope
-  to extend this to other ML methods; note that this does not affect the
-  generality of the results, which hold against any classifier,
-- computes one estimate at the time, which can be improved in the future.
-
 # Install
 
-The code is written in Rust, but it is thought to be used as a
-stand-alone command line tool.
+The code is written in `Rust`, but it is thought to be used as a
+standalone command line tool.
 Bindings to other programming languages (e.g., Python) may happen in the
 future.
 
@@ -52,24 +42,32 @@ as shown above.
 
 # Usage
 
-*(Section under construction)*
+**(Section under construction)**
 
 `fbleau` accepts as input CSV files of the following form:
 
-```
-s_1, x^1_1, ..., x^d_1
-s_2, x^1_2, ..., x^d_2
-...
-```
+<p align="center">
+  <a href="https://www.codecogs.com/eqnedit.php?latex=\begin{align*}&space;s_1,&space;o^{(1)}_1&,&space;...,&space;o^{(d)}_1\\&space;s_2,&space;o^{(1)}_2&,&space;...,&space;o^{(d)}_2\\&space;&...&space;\end{align*}" target="_blank"><img src="https://latex.codecogs.com/png.latex?\begin{align*}&space;s_1,&space;o^{(1)}_1&,&space;...,&space;o^{(d)}_1\\&space;s_2,&space;o^{(1)}_2&,&space;...,&space;o^{(d)}_2\\&space;&...&space;\end{align*}" title="\begin{align*} s_1, o^{(1)}_1&, ..., o^{(d)}_1\\ s_2, o^{(1)}_2&, ..., o^{(d)}_2\\ &... \end{align*}" /></a>
+</p>
 
-Each row represents an observation sampled from the black-box,
-where $s_i$ is the secret input given to the system, and
-$o^1_i, ..., o^d_i$ is the (vector) output of the system.
+Each row represents an example sampled from the black-box,
+where <a href="https://www.codecogs.com/eqnedit.php?latex=\inline&space;s_i" target="_blank"><img src="https://latex.codecogs.com/png.latex?\inline&space;s_i" title="s_i" /></a>
+is the secret input given to the system, and
+<a href="https://www.codecogs.com/eqnedit.php?latex=\inline&space;(o^{(1)}_i&,&space;...,&space;o^{(d)}_i)" target="_blank"><img src="https://latex.codecogs.com/png.latex?\inline&space;(o^{(1)}_i&,&space;...,&space;o^{(d)}_i)" title="(o^{(1)}_i&, ..., o^{(d)}_i)" /></a>
+is the (vector) output of the system.
 Secrets must have discrete values (although this restriction can be
 lifted in the future), outputs may have either discrete or continuous
 values.
 
 ## TODO
+
+Currently, the code provided here:
+- only estimates the Bayes risk (one has to derive the desired leakage measure
+  from it manually),
+- is based on frequentist and nearest neighbor methods; in the future we hope
+  to extend this to other ML methods; note that this does not affect the
+  generality of the results, which hold against any classifier,
+- computes one estimate at the time, which can be improved in the future.
 
 ### Short term
 
