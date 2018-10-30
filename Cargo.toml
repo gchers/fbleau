@@ -1,0 +1,23 @@
+[package]
+name = "fbleau"
+version = "0.1.0"
+authors = ["Giovanni Cherubin <g.chers@gmail.com>"]
+description = "A tool for measuring black-box security"
+
+[dependencies]
+ndarray = "0.11.0"
+docopt = "1"
+itertools = "0.7.8"
+serde = "1.0.70"
+serde_derive = "1.0.70"
+csv = "1.0.0"
+ndarray-parallel = "0.8"
+ordered-float = "0.5.0"
+
+[dev-dependencies]
+rustlearn = "0.5.0"
+bencher = "0.1.5"
+
+[[bench]]
+name = "knn"
+harness = false
