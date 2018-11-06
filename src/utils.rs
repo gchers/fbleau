@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use self::csv::ReaderBuilder;
 use std::str::FromStr;
 use std::f64;
+use itertools::Itertools;
 
 use fbleau::Label;
 
@@ -106,6 +107,23 @@ pub fn scale01(matrix: &mut Array2<f64>) {
             row[i] = (row[i] - min[i]) / (max[i] - min[i]);
         }
     }
+}
+
+/// Estimates the priors on a vector of labels, and computes the
+/// random guessing error as 1 - max priors.
+pub fn estimate_random_guessing(labels: &ArrayView1<usize>) -> f64 {
+    let mut counts = HashMap::new();
+    let mut max_count = 0;
+
+    for y in labels {
+        let count = counts.entry(y).or_insert(0);
+        *count += 1;
+        if *count > max_count {
+            max_count = *count;
+        }
+    }
+
+    1. - (max_count as f64) / (labels.len() as f64)
 }
 
 
