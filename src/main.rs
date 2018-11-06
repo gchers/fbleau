@@ -19,12 +19,12 @@ use utils::{load_data, vectors_to_ids, scale01};
 const USAGE: &'static str = "
 Estimate k-NN error and convergence.
 
-Usage: fast-knn log [options] <train> <test>
-       fast-knn log10 [options] <train> <test>
-       fast-knn nn-bound [options] <train> <test>
-       fast-knn --knn=<k> [options] <train> <test>
-       fast-knn frequentist [options] <train> <test>
-       fast-knn (--help | --version)
+Usage: fbleau log [options] <train> <test>
+       fbleau log10 [options] <train> <test>
+       fbleau nn-bound [options] <train> <test>
+       fbleau --knn=<k> [options] <train> <test>
+       fbleau frequentist [options] <train> <test>
+       fbleau (--help | --version)
 
 Options:
     --delta=<d>                 Delta for delta covergence [default: 0.1].
