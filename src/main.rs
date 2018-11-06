@@ -227,6 +227,7 @@ fn main() {
                                                       .into_shape((train_y.len(), 1))
                                                       .unwrap(), None);
     let train_nlabels = mapping.len();
+    // Remap test labels according to the mapping used for training labels.
     let (test_y, mapping) = vectors_to_ids(test_y.view()
                                                     .into_shape((test_y.len(), 1))
                                                     .unwrap(), Some(mapping));
@@ -235,8 +236,13 @@ fn main() {
     // the mapping is extended, so we can assert that didn't happen
     // as follows.
     let nlabels = mapping.len();
+    // NOTE (6/11/18): this assertion could be removed with an optional
+    // command line flag; indeed, to my understanding, this won't cause
+    // problems to the estimation. However, for the time being I'll keep
+    // it as it is, which is the "safest" option.
     assert_eq!(nlabels, train_nlabels,
-               "Test data contains labels unseen in training data");
+               "Test data contains labels unseen in training data.
+                Each test label should appear in the training data; the converse is not necessary");
 
     let max_k = args.flag_max_k;
 
