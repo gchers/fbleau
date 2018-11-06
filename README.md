@@ -62,8 +62,6 @@ values.
 ## TODO
 
 Currently, the code provided here:
-- only estimates the Bayes risk (one has to derive the desired leakage measure
-  from it manually),
 - is based on frequentist and nearest neighbor methods; in the future we hope
   to extend this to other ML methods; note that this does not affect the
   generality of the results, which hold against any classifier,
@@ -71,7 +69,7 @@ Currently, the code provided here:
 
 ### Short term
 
-- [ ] return various leakage measures (instead of R*)
+- [x] return various leakage measures (instead of just R*)
 - [ ] resubstitution estimate
 
 ### Mid term
