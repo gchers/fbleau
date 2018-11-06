@@ -7,13 +7,15 @@ extern crate itertools;
 extern crate fbleau;
 
 mod utils;
+mod security_measures;
 
 use ndarray::*;
 use docopt::Docopt;
 
 use fbleau::Label;
 use fbleau::estimates::*;
-use utils::{load_data, vectors_to_ids, scale01};
+use security_measures::*;
+use utils::{load_data, vectors_to_ids, scale01, estimate_random_guessing};
 
 
 const USAGE: &'static str = "
@@ -116,6 +118,17 @@ fn k_from_n(args: &Args) -> Box<Fn(usize) -> usize> {
     }
 }
 
+fn print_all_measures(bayes_risk_estimate: f64, random_guessing: f64) {
+    println!("Multiplicative Leakage: {}",
+             multiplicative_leakage(bayes_risk_estimate, random_guessing));
+    println!("Additive Leakage: {}",
+             additive_leakage(bayes_risk_estimate, random_guessing));
+    println!("Bayes security measure: {}",
+             bayes_security_measure(bayes_risk_estimate, random_guessing));
+    println!("Min-entropy Leakage: {}",
+             min_entropy_leakage(bayes_risk_estimate, random_guessing));
+}
+
 fn run_forward_strategy(args: &Args, nlabels: usize, deltas: &Vec<f64>, q: usize,
                         max_k: usize, kn: Box<Fn(usize) -> usize>,
                         mut train_x: Array2<f64>, train_y: Array1<Label>,
@@ -157,11 +170,12 @@ fn run_forward_strategy(args: &Args, nlabels: usize, deltas: &Vec<f64>, q: usize
     // Print header.
     println!("n, k, error-count, error, bound");
     let mut min_error = 1.0;
+    let mut last_error = 1.0;
 
     for (n, (x, y)) in train_x.outer_iter().zip(train_y.iter()).enumerate() {
 
         // Compute error.
-        let error = match estimator.next(n, &x, *y) {
+        last_error = match estimator.next(n, &x, *y) {
             Ok(error) => error,
             Err(_) => {
                 // FIXME: we should exit at the end of the loop.
@@ -170,24 +184,25 @@ fn run_forward_strategy(args: &Args, nlabels: usize, deltas: &Vec<f64>, q: usize
             },
         };
 
-        if min_error > error {
-            min_error = error;
+        if min_error > last_error {
+            min_error = last_error;
         }
 
         // Compute NN bound by Cover and Hart if requested.
         let bound = if args.cmd_nn_bound {
-            nn_bound(error, nlabels)
+            nn_bound(last_error, nlabels)
         } else { -1. };
 
         let k = kn(n);
-        println!("{}, {}, {}, {}, {}", n, k, estimator.error_count(), error, bound);
+        println!("{}, {}, {}, {}, {}", n, k, estimator.error_count(),
+                 last_error, bound);
 
         // Check convergence.
         if args.cmd_nn_bound {
             convergence_checker.add_estimate(bound);
         }
         else {
-            convergence_checker.add_estimate(error);
+            convergence_checker.add_estimate(last_error);
         }
 
         if !args.flag_run_all && convergence_checker.all_converged() {
@@ -207,7 +222,22 @@ fn run_forward_strategy(args: &Args, nlabels: usize, deltas: &Vec<f64>, q: usize
         }
     }
 
+    if args.cmd_nn_bound {
+        min_error = nn_bound(min_error, nlabels);
+        last_error = nn_bound(last_error, nlabels);
+    }
+
+    println!();
+    let random_guessing = estimate_random_guessing(&test_y.view());
+    println!("Random guessing error: {}", random_guessing);
+    println!();
+
+    println!("Final estimate: {}", last_error);
+    print_all_measures(last_error, random_guessing);
+    println!();
+
     println!("Minimum estimate: {}", min_error);
+    print_all_measures(min_error, random_guessing);
 }
 
 
