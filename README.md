@@ -33,10 +33,11 @@ It runs a chosen method for estimating the Bayes risk (smallest probability
 of error of an adversary at predicting a secret given the respective output),
 and relative security measures.
 
-The syntax is:
+The general syntax is:
+
     fbleau <estimate> [options] <train> <test>
 
-## Commands
+## Estimates
 
 Currently available estimates:
 
