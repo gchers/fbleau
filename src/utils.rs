@@ -8,7 +8,6 @@ use std::collections::HashMap;
 use self::csv::ReaderBuilder;
 use std::str::FromStr;
 use std::f64;
-use itertools::Itertools;
 
 use fbleau::Label;
 
