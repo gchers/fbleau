@@ -1,5 +1,4 @@
 //! Frequentist Bayes risks estimate for discrete secret and output space.
-//!
 use ndarray::*;
 use itertools::Itertools;
 use std::collections::HashMap;
