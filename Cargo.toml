@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Giovanni Cherubin <g.chers@gmail.com>"]
 description = "A tool for measuring black-box security"
 repository = "https://github.com/gchers/fbleau"
+exclude = [
+    "examples/*"
+]
 
 [dependencies]
 ndarray = "0.11.0"
