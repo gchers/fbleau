@@ -84,8 +84,20 @@ standalone command line tool.
 Bindings to other programming languages (e.g., Python) may happen in the
 future.
 
-Install [rustup](https://rustup.rs) (and, consequently, `cargo`).
+Install [rustup](https://rustup.rs), which will make `cargo` available
+on your path.
 Then run:
+
+```
+cargo install fbleau
+```
+
+You should now find the binary `fbleau` in your `$PATH` (if not,
+check out [rustup](https://rustup.rs) again).
+
+*Note* If `rustup` is not available on your system (e.g., \*BSD systems),
+you should still be able to install `cargo` with the system's
+package manager, and then compile `fbleau` as follows:
 
 ```
 git clone https://github.com/gchers/fbleau
@@ -93,14 +105,7 @@ cd fbleau
 cargo install
 ```
 
-You should now find the binary `fbleau` in your `$PATH` (if not,
-check out [rustup](https://rustup.rs) again).
-
-*Note* If `rustup` is not available on your system (e.g., \*BSD systems),
-you should still be able to install `cargo` and compile `fbleau`
-as shown above.
-
-*Note* I'll also put `fbleau` on https://crates.io, hopefully soon.
+If this doesn't work, please open a ticket.
 
 
 ## TODO
