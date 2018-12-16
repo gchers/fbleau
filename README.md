@@ -1,4 +1,4 @@
-# F-BLEAU
+# F-BLEAU <br><img src="https://github.com/gchers/fbleau/raw/gh-pages/img/forest.png" width="150" height="150" />
 
 F-BLEAU is a tool for estimating the leakage of a system about its secrets in
 a black-box manner (i.e., by only looking at examples of secret inputs and
