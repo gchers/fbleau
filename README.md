@@ -77,6 +77,14 @@ When the system's outputs are vectors, `fbleau` by default scales their
 values. The option `--no-scale` prevents this (not recommended in
 general).
 
+## Number of threads
+
+By default, `fbleau` will use a number of threads equal to the number
+of (virtual) cores.
+To limit this number, you can set the environment variable
+`RAYON_NUM_THREADS` before running it.
+In the future, we'll add this as a command line option.
+
 # Install
 
 The code is written in `Rust`, but it is thought to be used as a
