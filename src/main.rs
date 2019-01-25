@@ -224,7 +224,7 @@ fn run_forward_strategy(args: &Args, nlabels: usize, deltas: &Vec<f64>, q: usize
         // to fix that, we could simply remove the next line, and record
         // "mapping" from the line below. However, I want to be certain
         // the result is identical, and I don't have time to test this now.
-        let (train_ids, mapping) = vectors_to_ids(train_x.view(), None);
+        let (_train_ids, mapping) = vectors_to_ids(train_x.view(), None);
         let (test_ids, _) = vectors_to_ids(test_x.view(), Some(mapping.clone()));
 
         Estimator::Frequentist(FrequentistEstimator::new(nlabels,
