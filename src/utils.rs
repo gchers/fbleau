@@ -35,7 +35,9 @@ pub fn load_data<T>(fname: &String)
                             .map(|x| x.trim()
                                       .parse::<T>().ok()
                                                      .expect("Failed to parse")));
-        targets.push(record[0].parse::<usize>()?);
+        targets.push(record[0].parse::<usize>()
+                        .expect(&format!("Could not parse file {}. Error at line: {:?}",
+                                         fname, record)));
 
         if let Some(x) = ncols {
             if x != record.len() - 1 {
