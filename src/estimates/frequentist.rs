@@ -223,7 +223,7 @@ impl FrequentistEstimator {
         self.train_x.push(x);
         self.train_y.push(y);
 
-        let old_priors_pred = match self.priors_count.predict() {
+        let mut old_priors_pred = match self.priors_count.predict() {
             Some(pred) => pred,
             None => { return self.add_first_example(x, y) },
         };
@@ -244,6 +244,10 @@ impl FrequentistEstimator {
                     self.error_count = self.error_count + new_error - old_error;
                 }
             }
+            // NOTE: we also need to update the value of old_priors_pred,
+            // because otherwise we'll have issues when updating w.r.t.
+            // the joint distribution later in this function.
+            old_priors_pred = new_pred;
         }
 
         // Update joint counts (and error), but only if `x` appears
@@ -260,6 +264,7 @@ impl FrequentistEstimator {
                 let new_pred = joint.predict().unwrap();
 
                 for (&xi, &yi) in self.test_x.iter().zip(&self.test_y) {
+                    // Only update predictions for observations with value `x`.
                     if xi == x {
                         let old_error = if yi != old_pred { 1 } else { 0 };
                         let new_error = if yi != new_pred { 1 } else { 0 };
