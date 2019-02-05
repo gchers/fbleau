@@ -78,6 +78,7 @@ extern crate ndarray;
 extern crate docopt;
 #[macro_use]
 extern crate serde_derive;
+extern crate serde_json;
 extern crate itertools;
 
 extern crate fbleau;
@@ -207,51 +208,23 @@ fn print_all_measures(bayes_risk_estimate: f64, random_guessing: f64) {
              min_entropy_leakage(bayes_risk_estimate, random_guessing));
 }
 
-fn run_forward_strategy(args: &Args, nlabels: usize, deltas: &Vec<f64>, q: usize,
-                        max_k: usize, kn: Box<Fn(usize) -> usize>,
-                        mut train_x: Array2<f64>, train_y: Array1<Label>,
-                        mut test_x: Array2<f64>, test_y: Array1<Label>) {
+/// Estimates security measures with a forward strategy (i.e., with an
+/// increasing number of examples).
+fn run_forward_strategy(mut estimator: Estimator, absolute_convergence: bool,
+                        run_all: bool, compute_nn_bound: bool,
+                        nlabels: usize, deltas: &Vec<f64>, q: usize,
+                        train_x: Array2<f64>, train_y: Array1<Label>)
+        -> (f64, f64) {
 
-    // Initialize.
-    let mut estimator = if args.cmd_frequentist {
-        // FIXME: this WILL lose precision, so we need to work with
-        // f64 that are actually integers in practice.
-        let train_x = train_x.map(|x| *x as usize);
-        let test_x = test_x.map(|x| *x as usize);
-
-        // NOTE: we remap even if feature vectors have size 1.
-        // FIXME: there's a warning on train_ids not being used;
-        // to fix that, we could simply remove the next line, and record
-        // "mapping" from the line below. However, I want to be certain
-        // the result is identical, and I don't have time to test this now.
-        let (_train_ids, mapping) = vectors_to_ids(train_x.view(), None);
-        let (test_ids, _) = vectors_to_ids(test_x.view(), Some(mapping.clone()));
-
-        Estimator::Frequentist(FrequentistEstimator::new(nlabels,
-                                 &test_ids.view(),
-                                 &test_y.view()), mapping)
-    } else {
-        if train_x.cols() > 1 && !args.flag_no_scale {
-            println!("scaling features");
-            scale01(&mut train_x);
-            scale01(&mut test_x);
-        }
-        Estimator::KNN(KNNEstimator::new(&test_x.view(), &test_y.view(),
-                                         1, max_k), kn)
-    };
-
-
-    let mut convergence_checker = ForwardChecker::new(deltas, q, !args.flag_abs);
-    // NOTE: temporary fix.
-    let kn = k_from_n(&args);
+    let mut convergence_checker = ForwardChecker::new(deltas, q, !absolute_convergence);
 
     // Print header.
     println!("n, k, error-count, error, bound");
+
     let mut min_error = 1.0;
     let mut last_error = 1.0;
 
     for (n, (x, y)) in train_x.outer_iter().zip(train_y.iter()).enumerate() {
-
         // Compute error.
         last_error = match estimator.next(n, &x, *y) {
             Ok(error) => error,
@@ -262,33 +235,24 @@ fn run_forward_strategy(args: &Args, nlabels: usize, deltas: &Vec<f64>, q: usize
             },
         };
 
+        // Compute NN bound by Cover and Hart if needed.
+        if compute_nn_bound {
+            last_error = nn_bound(last_error, nlabels);
+        }
+
         if min_error > last_error {
             min_error = last_error;
         }
 
-        // Compute NN bound by Cover and Hart if requested.
-        let bound = if args.cmd_nn_bound {
-            nn_bound(last_error, nlabels)
-        } else { -1. };
+        println!("{}, {}, {}", n, estimator.error_count(), last_error);
 
-        let k = kn(n);
-        println!("{}, {}, {}, {}, {}", n, k, estimator.error_count(),
-                 last_error, bound);
+        convergence_checker.add_estimate(last_error);
 
-        // Check convergence.
-        if args.cmd_nn_bound {
-            convergence_checker.add_estimate(bound);
-        }
-        else {
-            convergence_checker.add_estimate(last_error);
-        }
-
-        if !args.flag_run_all && convergence_checker.all_converged() {
+        if !run_all && convergence_checker.all_converged() {
             break;
         }
     }
 
-    // Print for what deltas we converged after how many examples.
     for (delta, converged) in convergence_checker.get_converged() {
         if let Some(converged) = converged {
             println!("[*] {}-convergence after {} examples", delta, converged);
@@ -300,22 +264,7 @@ fn run_forward_strategy(args: &Args, nlabels: usize, deltas: &Vec<f64>, q: usize
         }
     }
 
-    if args.cmd_nn_bound {
-        min_error = nn_bound(min_error, nlabels);
-        last_error = nn_bound(last_error, nlabels);
-    }
-
-    println!();
-    let random_guessing = estimate_random_guessing(&test_y.view());
-    println!("Random guessing error: {}", random_guessing);
-    println!();
-
-    println!("Final estimate: {}", last_error);
-    print_all_measures(last_error, random_guessing);
-    println!();
-
-    println!("Minimum estimate: {}", min_error);
-    print_all_measures(min_error, random_guessing);
+    (min_error, last_error)
 }
 
 
@@ -325,9 +274,9 @@ fn main() {
                             .and_then(|d| d.deserialize())
                             .unwrap_or_else(|e| e.exit());
 
-    let (train_x, train_y) = load_data::<f64>(&args.arg_train)
+    let (mut train_x, train_y) = load_data::<f64>(&args.arg_train)
                                 .expect("[!] failed to load training data");
-    let (test_x, test_y) = load_data::<f64>(&args.arg_test)
+    let (mut test_x, test_y) = load_data::<f64>(&args.arg_test)
                                 .expect("[!] failed to load test data");
 
     // Remap labels so they are zero-based increasing numbers.
@@ -365,6 +314,44 @@ fn main() {
     // How k is computed w.r.t. n.
     let kn = k_from_n(&args);
 
-    run_forward_strategy(&args, nlabels, &deltas, q, max_k, kn,
-                         train_x, train_y, test_x, test_y);
+    // Init the estimator.
+    let estimator = if args.cmd_frequentist {
+        // FIXME: this WILL lose precision, so we need to work with
+        // f64 that are actually integers in practice.
+        let train_x = train_x.map(|x| *x as usize);
+        let test_x = test_x.map(|x| *x as usize);
+
+        // NOTE: we remap even if feature vectors have size 1.
+        let (_train_ids, mapping) = vectors_to_ids(train_x.view(), None);
+        let (test_ids, _) = vectors_to_ids(test_x.view(), Some(mapping.clone()));
+
+        Estimator::Frequentist(FrequentistEstimator::new(nlabels,
+                                 &test_ids.view(),
+                                 &test_y.view()), mapping)
+    } else {
+        if train_x.cols() > 1 && !args.flag_no_scale {
+            println!("scaling features");
+            scale01(&mut train_x);
+            scale01(&mut test_x);
+        }
+        Estimator::KNN(KNNEstimator::new(&test_x.view(), &test_y.view(),
+                                         1, max_k), kn)
+    };
+
+    let random_guessing = estimate_random_guessing(&test_y.view());
+    println!("Random guessing error: {}", random_guessing);
+    println!("Estimating leakage measures...");
+
+    let (min_error, last_error) = run_forward_strategy(estimator, args.flag_abs,
+                                                 args.flag_run_all,
+                                                 args.cmd_nn_bound, nlabels,
+                                                 &deltas, q, train_x, train_y);
+
+    println!();
+    println!("Final estimate: {}", last_error);
+    print_all_measures(last_error, random_guessing);
+    println!();
+
+    println!("Minimum estimate: {}", min_error);
+    print_all_measures(min_error, random_guessing);
 }
