@@ -2,6 +2,7 @@
 use ndarray::*;
 use itertools::Itertools;
 use std::collections::HashMap;
+use ordered_float::OrderedFloat;
 
 use Label;
 use estimates::{some_or_error};
@@ -109,16 +110,24 @@ pub struct FrequentistEstimator {
     train_y: Vec<Label>,
     test_x: Vec<ObjectValue>,
     test_y: Vec<Label>,
+    // Mapping from objects (feature vectors) to indexes.
+    array_to_index: ArrayToIndex,
 }
 
 impl FrequentistEstimator {
-    pub fn new(n_labels: usize, test_x: &ArrayView1<ObjectValue>,
+    pub fn new(n_labels: usize, test_x: &ArrayView2<f64>,
                test_y: &ArrayView1<Label>)
             -> FrequentistEstimator {
 
         // Init counts.
         let priors_count = FrequencyCount::new(n_labels);
         let mut joint_count: HashMap<ObjectValue, FrequencyCount> = HashMap::new();
+
+        // Converts objects (feature vectors) into ids.
+        let mut array_to_index = ArrayToIndex::new();
+        let test_x = test_x.outer_iter()
+                           .map(|x| array_to_index.map(x))
+                           .collect::<Vec<_>>();
 
         // Instantiate points for which we need a prediction.
         // We'll only have information for the intersection of
@@ -137,10 +146,9 @@ impl FrequentistEstimator {
             train_y: vec![],
             test_x: test_x.to_vec(),
             test_y: test_y.to_vec(),
+            array_to_index: array_to_index,
         }
     }
-
-
 
     pub fn from_data(n_labels: usize, train_x: &ArrayView1<ObjectValue>,
                      train_y: &ArrayView1<Label>, test_x: &ArrayView1<ObjectValue>,
@@ -197,6 +205,7 @@ impl FrequentistEstimator {
             train_y: train_y.to_vec(),
             test_x: test_x.to_vec(),
             test_y: test_y.to_vec(),
+            array_to_index: ArrayToIndex::new(),
         }
     }
 
@@ -218,8 +227,9 @@ impl FrequentistEstimator {
         }
     }
 
-
-    pub fn add_example(&mut self, x: ObjectValue, y: Label) {
+    /// Adds a new training example.
+    pub fn add_example(&mut self, x: ArrayView1<f64>, y: Label) {
+        let x = self.array_to_index.map(x);
         self.train_x.push(x);
         self.train_y.push(y);
 
@@ -339,6 +349,38 @@ impl FrequentistEstimator {
         self.error_count
     }
 }
+
+/// Maps an object (feature vector of float numbers) into an index.
+struct ArrayToIndex {
+    mapping: HashMap<Vec<OrderedFloat<f64>>, usize>,
+    next_id: usize,
+}
+
+impl ArrayToIndex {
+    pub fn new() -> ArrayToIndex {
+        ArrayToIndex {
+            mapping: HashMap::new(),
+            next_id: 0,
+        }
+    }
+
+    pub fn map(&mut self, x: ArrayView1<f64>) -> ObjectValue {
+        let x = x.iter()
+                 .map(|&x| OrderedFloat::from(x))
+                 .collect::<Vec<_>>();
+
+        let ref mut mapping = self.mapping;
+        let ref mut next_id = self.next_id;
+        let id = mapping.entry(x.to_owned())
+                             .or_insert_with(|| { *next_id += 1;
+                                                  *next_id - 1});
+        *id
+    }
+}
+
+
+
+
 
 
 #[cfg(test)]
