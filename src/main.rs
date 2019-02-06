@@ -61,9 +61,9 @@
 //!
 //! By default, `fbleau` runs until a convergence criterion is met.
 //! We usually declare convergence if an estimate did not vary more
-//! than `--delta`, either in relative (default) or absolute (`--abs`) value,
-//! from its value in the last `q` examples (where `q` is specified with
-//! `--qstop`).
+//! than `--delta`, either in relative (default) or absolute
+//! (`--absolute`) value, from its value in the last `q` examples
+//! (where `q` is specified with `--qstop`).
 //! One can specify more than one deltas as comma-separated values, e.g.:
 //! `--delta=0.1,0.01,0.001`.
 //!
@@ -109,13 +109,10 @@ Usage: fbleau log [options] <train> <test>
 Options:
     --verbose=<fname>           Logs estimates at each step.
     --delta=<d>                 Delta for delta covergence [default: 0.1].
-                                Multiple deltas can be specified as
-                                comma-separated values.
     --qstop=<q>                 Number of examples to declare
                                 delta-convergence. Default is 10% of
                                 training data.
-    --run-all                   Don't stop running after convergence.
-    --abs                       Use absolute convergence instead of relative
+    --absolute                  Use absolute convergence instead of relative
                                 convergence.
     --max-k=<k>                 Number of neighbors to store, initially,
                                 for each test point [default: 100].
@@ -134,12 +131,11 @@ struct Args {
     cmd_frequentist: bool,
     flag_knn: Option<usize>,
     flag_verbose: Option<String>,
-    flag_delta: String,
+    flag_delta: Option<f64>,
     flag_qstop: Option<usize>,
     flag_max_k: usize,
-    flag_abs: bool,
+    flag_absolute: bool,
     flag_scale: bool,
-    flag_run_all: bool,
     arg_train: String,
     arg_test: String,
 }
@@ -150,13 +146,6 @@ fn next_odd(n: usize) -> usize {
         0 => n + 1,
         _ => n,
     }
-}
-
-/// Parses a string of deltas specified as comma-separated values.
-fn parse_deltas(deltas: &str) -> Vec<f64> {
-    deltas.split(",")
-        .map(|s| s.parse::<f64>().expect("couldn't parse deltas"))
-        .collect::<Vec<_>>()
 }
 
 /// Computes the NN bound derived from Cover&Hart, given
@@ -213,15 +202,10 @@ fn print_all_measures(bayes_risk_estimate: f64, random_guessing: f64) {
 
 /// Estimates security measures with a forward strategy (i.e., with an
 /// increasing number of examples).
-fn run_forward_strategy(mut estimator: Estimator, absolute_convergence: bool,
-                        run_all: bool, compute_nn_bound: bool,
-                        nlabels: usize, deltas: &Vec<f64>, q: usize,
-                        verbose: Option<String>,
-                        train_x: Array2<f64>, train_y: Array1<Label>)
-        -> (f64, f64) {
-
-    let mut convergence_checker = ForwardChecker::new(deltas, q, !absolute_convergence);
-
+fn run_forward_strategy(mut estimator: Estimator, compute_nn_bound: bool,
+                        nlabels: usize, mut convergence_checker: Option<ForwardChecker>,
+                        verbose: Option<String>, train_x: Array2<f64>,
+                        train_y: Array1<Label>) -> (f64, f64) {
     // Init verbose log file.
     let mut logfile = if let Some(fname) = verbose {
         let mut logfile = File::create(&fname)
@@ -261,22 +245,12 @@ fn run_forward_strategy(mut estimator: Estimator, absolute_convergence: bool,
                    last_error).expect("failed to write to verbose file");
         }
 
-        // Should we stop?
-        convergence_checker.add_estimate(last_error);
-
-        if !run_all && convergence_checker.all_converged() {
-            break;
-        }
-    }
-
-    for (delta, converged) in convergence_checker.get_converged() {
-        if let Some(converged) = converged {
-            println!("[*] {}-convergence after {} examples", delta, converged);
-        }
-    }
-    for (delta, converged) in convergence_checker.get_not_converged() {
-        if let Some(converged) = converged {
-            println!("[*] {}-convergence (< q!) after {} examples", delta, converged);
+        // Should we stop because of (delta, q)-convergence?
+        if let Some(ref mut checker) = convergence_checker {
+            checker.add_estimate(last_error);
+            if checker.all_converged() {
+                break;
+            }
         }
     }
 
@@ -319,19 +293,28 @@ fn main() {
 
     let max_k = args.flag_max_k;
 
-    // Deltas and q for delta-convergence.
-    let deltas = parse_deltas(&args.flag_delta);
-    let q = match args.flag_qstop {
-        Some(q) => if q < train_x.len() { q } else { train_x.len()-1 },
-        None => (train_x.len() as f64 * 0.1) as usize,
+    // (delta, q)-convergence checker
+    let convergence_checker = if args.flag_delta.is_none() && args.flag_qstop.is_none() {
+        // By default, run all (i.e., don't stop for (delta, q)-convergence.
+        None
+    } else if let Some(delta) = args.flag_delta {
+        let q = match args.flag_qstop {
+            Some(q) => if q < train_x.len() { q } else { train_x.len()-1 },
+            None => (train_x.len() as f64 * 0.1) as usize,
+        };
+        Some(ForwardChecker::new(&vec![delta], q, !args.flag_absolute))
+    } else {
+        panic!("--qstop should only be specified with --delta");
     };
-    println!("Convergence q: {}", q);
 
+    // Scale features.
     if train_x.cols() > 1 && args.flag_scale {
         println!("scaling features");
         scale01(&mut train_x);
         scale01(&mut test_x);
     }
+
+    // Init estimator.
     let estimator = if args.cmd_frequentist {
         Estimator::Frequentist(FrequentistEstimator::new(nlabels,
                                  &test_x.view(),
@@ -347,11 +330,11 @@ fn main() {
     println!("Random guessing error: {}", random_guessing);
     println!("Estimating leakage measures...");
 
-    let (min_error, last_error) = run_forward_strategy(estimator, args.flag_abs,
-                                                 args.flag_run_all,
-                                                 args.cmd_nn_bound, nlabels,
-                                                 &deltas, q, args.flag_verbose,
-                                                 train_x, train_y);
+
+    let (min_error, last_error) = run_forward_strategy(estimator, args.cmd_nn_bound,
+                                                       nlabels, convergence_checker,
+                                                       args.flag_verbose, train_x,
+                                                       train_y);
 
     println!();
     println!("Final estimate: {}", last_error);
