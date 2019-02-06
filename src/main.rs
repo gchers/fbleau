@@ -87,7 +87,9 @@ mod utils;
 mod security_measures;
 
 use ndarray::*;
+use std::fs::File;
 use docopt::Docopt;
+use std::io::Write;
 
 use fbleau::Label;
 use fbleau::estimates::*;
@@ -106,6 +108,7 @@ Usage: fbleau log [options] <train> <test>
        fbleau (--help | --version)
 
 Options:
+    --verbose=<fname>           Logs estimates at each step.
     --delta=<d>                 Delta for delta covergence [default: 0.1].
                                 Multiple deltas can be specified as
                                 comma-separated values.
@@ -131,6 +134,7 @@ struct Args {
     cmd_nn_bound: bool,
     cmd_frequentist: bool,
     flag_knn: Option<usize>,
+    flag_verbose: Option<String>,
     flag_delta: String,
     flag_qstop: Option<usize>,
     flag_max_k: usize,
@@ -213,14 +217,23 @@ fn print_all_measures(bayes_risk_estimate: f64, random_guessing: f64) {
 fn run_forward_strategy(mut estimator: Estimator, absolute_convergence: bool,
                         run_all: bool, compute_nn_bound: bool,
                         nlabels: usize, deltas: &Vec<f64>, q: usize,
+                        verbose: Option<String>,
                         train_x: Array2<f64>, train_y: Array1<Label>)
         -> (f64, f64) {
 
     let mut convergence_checker = ForwardChecker::new(deltas, q, !absolute_convergence);
 
-    // Print header.
-    println!("n, k, error-count, error, bound");
+    // Init verbose log file.
+    let mut logfile = if let Some(fname) = verbose {
+        let mut logfile = File::create(&fname)
+                               .expect("couldn't open file for verbose logging");
+        writeln!(logfile, "n, error-count, estimate").expect("failed to write to verbose file");
+        Some(logfile)
+    } else {
+        None
+    };
 
+    // We keep track both of the minimum and of the last estimate.
     let mut min_error = 1.0;
     let mut last_error = 1.0;
 
@@ -244,8 +257,12 @@ fn run_forward_strategy(mut estimator: Estimator, absolute_convergence: bool,
             min_error = last_error;
         }
 
-        println!("{}, {}, {}", n, estimator.error_count(), last_error);
+        if let Some(ref mut logfile) = logfile {
+            writeln!(logfile, "{}, {}, {}", n, estimator.error_count(),
+                   last_error).expect("failed to write to verbose file");
+        }
 
+        // Should we stop?
         convergence_checker.add_estimate(last_error);
 
         if !run_all && convergence_checker.all_converged() {
@@ -345,7 +362,8 @@ fn main() {
     let (min_error, last_error) = run_forward_strategy(estimator, args.flag_abs,
                                                  args.flag_run_all,
                                                  args.cmd_nn_bound, nlabels,
-                                                 &deltas, q, train_x, train_y);
+                                                 &deltas, q, args.flag_verbose,
+                                                 train_x, train_y);
 
     println!();
     println!("Final estimate: {}", last_error);
