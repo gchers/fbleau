@@ -71,9 +71,8 @@
 //! set (`--run-all`), in which case `fbleau` will still report how many
 //! examples where required for convergence.
 //!
-//! When the system's outputs are vectors, `fbleau` by default scales their
-//! values. The option `--no-scale` prevents this (not recommended in
-//! general).
+//! When the system's outputs are vectors, `fbleau` by default does not
+//! scale their values. The option `--scale` allows scaling in 0-1.
 extern crate ndarray;
 extern crate docopt;
 #[macro_use]
@@ -120,7 +119,7 @@ Options:
                                 convergence.
     --max-k=<k>                 Number of neighbors to store, initially,
                                 for each test point [default: 100].
-    --no-scale                  Don't scale features before running k-NN
+    --scale                     Scale features before running k-NN
                                 (only makes sense for objects of 2 or more
                                 dimensions).
     -h, --help                  Show help.
@@ -139,7 +138,7 @@ struct Args {
     flag_qstop: Option<usize>,
     flag_max_k: usize,
     flag_abs: bool,
-    flag_no_scale: bool,
+    flag_scale: bool,
     flag_run_all: bool,
     arg_train: String,
     arg_test: String,
@@ -328,7 +327,7 @@ fn main() {
     };
     println!("Convergence q: {}", q);
 
-    if train_x.cols() > 1 && !args.flag_no_scale {
+    if train_x.cols() > 1 && args.flag_scale {
         println!("scaling features");
         scale01(&mut train_x);
         scale01(&mut test_x);
