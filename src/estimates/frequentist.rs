@@ -529,10 +529,11 @@ mod tests {
     #[test]
     fn frequentist_estimate_forward() {
         let n_labels = 3;
-        let train_x = array![0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 6];
+        let train_x = array![[0.], [0.], [0.], [1.], [1.], [2.], [2.], [2.],
+                             [2.], [2.], [2.], [6.]];
         let train_y = array![0, 1, 1, 2, 2, 1, 2, 2, 0, 1, 1, 1];
 
-        let test_x = array![0, 0, 1, 2, 2, 8, 8];
+        let test_x = array![[0.], [0.], [1.], [2.], [2.], [8.], [8.]];
         let test_y = array![1, 1, 1, 1, 2, 1, 0];
 
         let mut freq = FrequentistEstimator::new(n_labels,
@@ -541,14 +542,14 @@ mod tests {
 
         // Estimate.
         // 11)
-        freq.add_example(train_x[0], train_y[0]);
+        freq.add_example(train_x.row(0), train_y[0]);
         assert_eq!(freq.joint_count.get(&0).unwrap().count, vec![1, 0, 0]);
         assert_eq!(freq.joint_count.get(&0).unwrap().predict().unwrap(), 0);
         assert_eq!(freq.priors_count.count, vec![1, 0, 0]);
         assert_eq!(freq.error_count, 6);
 
         // 10)
-        freq.add_example(train_x[1], train_y[1]);
+        freq.add_example(train_x.row(1), train_y[1]);
         assert_eq!(freq.joint_count.get(&0).unwrap().count, vec![1, 1, 0]);
         assert_eq!(freq.priors_count.count, vec![1, 1, 0]);
         //assert_eq!(freq.error_count, 2);
@@ -559,7 +560,7 @@ mod tests {
         assert_eq!(freq.error_count, 6);
 
         // 9)
-        freq.add_example(train_x[2], train_y[2]);
+        freq.add_example(train_x.row(2), train_y[2]);
         assert_eq!(freq.joint_count.get(&1).unwrap().count, vec![0, 0, 0]);
         assert!(freq.joint_count.get(&1).unwrap().predict().is_none());
         assert_eq!(freq.priors_count.count, vec![1, 2, 0]);
@@ -567,14 +568,14 @@ mod tests {
 
 
         // 8)
-        freq.add_example(train_x[3], train_y[3]);
+        freq.add_example(train_x.row(3), train_y[3]);
         assert_eq!(freq.joint_count.get(&1).unwrap().count, vec![0, 0, 1]);
         assert_eq!(freq.joint_count.get(&1).unwrap().predict().unwrap(), 2);
         assert_eq!(freq.priors_count.count, vec![1, 2, 1]);
         assert_eq!(freq.error_count, 3);
 
         // 7)
-        freq.add_example(train_x[4], train_y[4]);
+        freq.add_example(train_x.row(4), train_y[4]);
         assert_eq!(freq.joint_count.get(&2).unwrap().count, vec![0, 0, 0]);
         // Starts predicting with priors also for 2.
         assert!(freq.joint_count.get(&2).unwrap().predict().is_none());
@@ -582,14 +583,14 @@ mod tests {
         assert_eq!(freq.error_count, 3);
 
         // 6)
-        freq.add_example(train_x[5], train_y[5]);
+        freq.add_example(train_x.row(5), train_y[5]);
         assert_eq!(freq.joint_count.get(&2).unwrap().count, vec![0, 1, 0]);
         assert_eq!(freq.joint_count.get(&2).unwrap().predict().unwrap(), 1);
         assert_eq!(freq.priors_count.count, vec![1, 3, 2]);
         assert_eq!(freq.error_count, 3);
 
         // 5)
-        freq.add_example(train_x[6], train_y[6]);
+        freq.add_example(train_x.row(6), train_y[6]);
         assert_eq!(freq.joint_count.get(&2).unwrap().count, vec![0, 1, 1]);
         //assert_eq!(freq.joint_count.get(&2).unwrap().predict().unwrap(), 2);
         let pred = freq.joint_count.get(&2).unwrap().predict().unwrap();
@@ -604,14 +605,14 @@ mod tests {
         assert!(freq.error_count == 3);
 
         // 4)
-        freq.add_example(train_x[7], train_y[7]);
+        freq.add_example(train_x.row(7), train_y[7]);
         assert_eq!(freq.joint_count.get(&2).unwrap().count, vec![0, 1, 2]);
         assert_eq!(freq.joint_count.get(&2).unwrap().predict().unwrap(), 2);
         assert_eq!(freq.priors_count.count, vec![1, 3, 4]);
         assert_eq!(freq.error_count, 4);
 
         // 3)
-        freq.add_example(train_x[8], train_y[8]);
+        freq.add_example(train_x.row(8), train_y[8]);
         assert_eq!(freq.joint_count.get(&2).unwrap().count, vec![1, 1, 2]);
         assert_eq!(freq.joint_count.get(&2).unwrap().predict().unwrap(), 2);
         assert_eq!(freq.priors_count.count, vec![2, 3, 4]);
@@ -619,7 +620,7 @@ mod tests {
         assert_eq!(freq.error_count, 4);    // Increases because of priors.
 
         // 2)
-        freq.add_example(train_x[9], train_y[9]);
+        freq.add_example(train_x.row(9), train_y[9]);
         assert_eq!(freq.joint_count.get(&2).unwrap().count, vec![1, 2, 2]);
         let pred = freq.joint_count.get(&2).unwrap().predict().unwrap();
         // More properly it should be: assert!(pred == 1 || pred == 2);
@@ -629,12 +630,12 @@ mod tests {
         assert_eq!(freq.error_count, 4);
 
         // 1)
-        freq.add_example(train_x[10], train_y[10]);
+        freq.add_example(train_x.row(10), train_y[10]);
         assert_eq!(freq.priors_count.count, vec![2, 5, 4]);
         assert_eq!(freq.error_count, 3);
 
         // 0)
-        freq.add_example(train_x[11], train_y[11]);
+        freq.add_example(train_x.row(11), train_y[11]);
         assert_eq!(freq.error_count, 3);
         assert_eq!(freq.priors_count.count, vec![2, 6, 4]);
     }
