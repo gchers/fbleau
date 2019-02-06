@@ -108,7 +108,7 @@ Usage: fbleau log [options] <train> <test>
 
 Options:
     --verbose=<fname>           Logs estimates at each step.
-    --delta=<d>                 Delta for delta covergence [default: 0.1].
+    --delta=<d>                 Delta for delta covergence.
     --qstop=<q>                 Number of examples to declare
                                 delta-convergence. Default is 10% of
                                 training data.
@@ -302,6 +302,7 @@ fn main() {
             Some(q) => if q < train_x.len() { q } else { train_x.len()-1 },
             None => (train_x.len() as f64 * 0.1) as usize,
         };
+        println!("will stop when (delta={}, q={})-converged", delta, q);
         Some(ForwardChecker::new(&vec![delta], q, !args.flag_absolute))
     } else {
         panic!("--qstop should only be specified with --delta");
