@@ -298,13 +298,13 @@ fn main() {
 
     // Remap labels so they are zero-based increasing numbers.
     let (train_y, mapping) = vectors_to_ids(train_y.view()
-                                                      .into_shape((train_y.len(), 1))
-                                                      .unwrap(), None);
+                                            .into_shape((train_y.len(), 1))
+                                            .unwrap(), None);
     let train_nlabels = mapping.len();
     // Remap test labels according to the mapping used for training labels.
     let (test_y, mapping) = vectors_to_ids(test_y.view()
-                                                    .into_shape((test_y.len(), 1))
-                                                    .unwrap(), Some(mapping));
+                                           .into_shape((test_y.len(), 1))
+                                           .unwrap(), Some(mapping));
     // The test labels should all have appeared in the training data;
     // the reverse is not necessary. If new labels appear in test_y,
     // the mapping is extended, so we can assert that didn't happen
@@ -328,29 +328,18 @@ fn main() {
     };
     println!("Convergence q: {}", q);
 
-    // How k is computed w.r.t. n.
-    let kn = k_from_n(&args);
-
-    // Init the estimator.
+    if train_x.cols() > 1 && !args.flag_no_scale {
+        println!("scaling features");
+        scale01(&mut train_x);
+        scale01(&mut test_x);
+    }
     let estimator = if args.cmd_frequentist {
-        // FIXME: this WILL lose precision, so we need to work with
-        // f64 that are actually integers in practice.
-        let train_x = train_x.map(|x| *x as usize);
-        let test_x = test_x.map(|x| *x as usize);
-
-        // NOTE: we remap even if feature vectors have size 1.
-        let (_train_ids, mapping) = vectors_to_ids(train_x.view(), None);
-        let (test_ids, _) = vectors_to_ids(test_x.view(), Some(mapping.clone()));
-
         Estimator::Frequentist(FrequentistEstimator::new(nlabels,
-                                 &test_ids.view(),
-                                 &test_y.view()), mapping)
+                                 &test_x.view(),
+                                 &test_y.view()))
     } else {
-        if train_x.cols() > 1 && !args.flag_no_scale {
-            println!("scaling features");
-            scale01(&mut train_x);
-            scale01(&mut test_x);
-        }
+        // How k is computed w.r.t. n.
+        let kn = k_from_n(&args);
         Estimator::KNN(KNNEstimator::new(&test_x.view(), &test_y.view(),
                                          1, max_k), kn)
     };

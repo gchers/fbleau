@@ -8,11 +8,10 @@ pub use self::convergence::ForwardChecker;
 
 use Label;
 use ndarray::prelude::*;
-use std::collections::HashMap;
 
 pub enum Estimator {
     KNN(KNNEstimator, Box<Fn(usize) -> usize>),
-    Frequentist(FrequentistEstimator, HashMap<Array1<usize>, usize>),
+    Frequentist(FrequentistEstimator),
 }
 
 impl Estimator {
@@ -25,13 +24,7 @@ impl Estimator {
                 estimator.add_example(x, y)?;
                 Ok(estimator.get_error())
             },
-            &mut Estimator::Frequentist(ref mut estimator, ref mapping) => {
-                // Not sure how to convert the error with
-                // mapping.get(&x.to_owned())?;
-                let x = match mapping.get(&x.map(|x| *x as usize).to_owned()) {
-                    Some(x) => x,
-                    None => return Err(()),
-                };
+            &mut Estimator::Frequentist(ref mut estimator) => {
                 estimator.add_example(*x, y);
                 Ok(estimator.get_error())
             },
@@ -43,7 +36,7 @@ impl Estimator {
         // TODO: let get_error_count() be part of a trait.
         match self {
             &Estimator::KNN(ref estimator, _) => estimator.get_error_count(),
-            &Estimator::Frequentist(ref estimator, _) => estimator.get_error_count(),
+            &Estimator::Frequentist(ref estimator) => estimator.get_error_count(),
         }
     }
 }
