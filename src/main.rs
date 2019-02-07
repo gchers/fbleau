@@ -79,6 +79,7 @@ extern crate docopt;
 extern crate serde_derive;
 extern crate serde_json;
 extern crate itertools;
+extern crate ndarray_parallel;
 
 extern crate fbleau;
 
@@ -89,6 +90,7 @@ use ndarray::*;
 use std::fs::File;
 use docopt::Docopt;
 use std::io::Write;
+use ndarray_parallel::rayon;
 
 use fbleau::Label;
 use fbleau::estimates::*;
@@ -119,6 +121,8 @@ Options:
     --scale                     Scale features before running k-NN
                                 (only makes sense for objects of 2 or more
                                 dimensions).
+    --nprocs=<n>                Number of threads to spawn. By default it is
+                                the number of available CPUs.
     -h, --help                  Show help.
     --version                   Show the version.
 ";
@@ -136,6 +140,7 @@ struct Args {
     flag_max_k: usize,
     flag_absolute: bool,
     flag_scale: bool,
+    flag_nprocs: Option<usize>,
     arg_train: String,
     arg_test: String,
 }
@@ -264,6 +269,15 @@ fn main() {
                             .and_then(|d| d.deserialize())
                             .unwrap_or_else(|e| e.exit());
 
+    // Number of processes.
+    if let Some(nprocs) = args.flag_nprocs {
+        rayon::ThreadPoolBuilder::new()
+                                 .num_threads(nprocs)
+                                 .build_global()
+                                 .unwrap();
+    }
+
+    // Load data.
     let (mut train_x, train_y) = load_data::<f64>(&args.arg_train)
                                 .expect("[!] failed to load training data");
     let (mut test_x, test_y) = load_data::<f64>(&args.arg_test)
@@ -330,7 +344,6 @@ fn main() {
     let random_guessing = estimate_random_guessing(&test_y.view());
     println!("Random guessing error: {}", random_guessing);
     println!("Estimating leakage measures...");
-
 
     let (min_error, last_error) = run_forward_strategy(estimator, args.cmd_nn_bound,
                                                        nlabels, convergence_checker,
