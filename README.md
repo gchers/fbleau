@@ -62,21 +62,18 @@ Note that this _does not_ guarantee convergence to the Bayes risk.
 
 ## Further options
 
-By default, `fbleau` runs until a convergence criterion is met.
-We usually declare convergence if an estimate did not vary more
-than `--delta`, either in relative (default) or absolute (`--abs`) value,
-from its value in the last `q` examples (where `q` is specified with
-`--qstop`).
-One can specify more than one deltas as comma-separated values, e.g.:
-`--delta=0.1,0.01,0.001`.
+It is often useful to know the value of an estimate at every step
+(i.e., for training size 1, 2, ...).
+`fbleau` can output this into a file specified by `--verbose=<logfile>`.
 
-Optionally, one may choose to let the estimator run for all the training
-set (`--run-all`), in which case `fbleau` will still report how many
-examples where required for convergence.
+By default, `fbleau` runs for all trainng data.
+However, one can specify a stopping criterion, in the form of a
+(delta, q)-convergence: `fbleau` stops when the estimate's value has
+not changed more than delta (`--delta`), either in relative (default) or
+absolute (`--absolute`) sense, for at least q steps (`--qstop`).
 
-When the system's outputs are vectors, `fbleau` by default scales their
-values. The option `--no-scale` prevents this (not recommended in
-general).
+`fbleau` can scale the individual values of the system's output ("features")
+in the `[0,1]` interval by specifying the `--scale` flag.
 
 ## Number of threads
 
