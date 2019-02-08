@@ -117,7 +117,8 @@ Options:
     --absolute                  Use absolute convergence instead of relative
                                 convergence.
     --max-k=<k>                 Number of neighbors to store, initially,
-                                for each test point [default: 100].
+                                for each test point. May improve performances,
+                                but only use if you know what you are doing.
     --scale                     Scale features before running k-NN
                                 (only makes sense for objects of 2 or more
                                 dimensions).
@@ -137,7 +138,7 @@ struct Args {
     flag_verbose: Option<String>,
     flag_delta: Option<f64>,
     flag_qstop: Option<usize>,
-    flag_max_k: usize,
+    flag_max_k: Option<usize>,
     flag_absolute: bool,
     flag_scale: bool,
     flag_nprocs: Option<usize>,
@@ -230,9 +231,9 @@ fn run_forward_strategy(mut estimator: Estimator, compute_nn_bound: bool,
         last_error = match estimator.next(n, &x, *y) {
             Ok(error) => error,
             Err(_) => {
-                // FIXME: we should exit at the end of the loop.
-                println!("stopped because could not remove any more examples");
-                break;
+                // TODO: this error is specific to k-NN. If we add new
+                // methods we may want to change this.
+                panic!("Could not add more examples: maybe increase --max-k?");
             },
         };
 
@@ -305,8 +306,6 @@ fn main() {
                "Test data contains labels unseen in training data.
                 Each test label should appear in the training data; the converse is not necessary");
 
-    let max_k = args.flag_max_k;
-
     // (delta, q)-convergence checker
     let convergence_checker = if args.flag_delta.is_none() && args.flag_qstop.is_none() {
         // By default, run all (i.e., don't stop for (delta, q)-convergence.
@@ -337,6 +336,15 @@ fn main() {
     } else {
         // How k is computed w.r.t. n.
         let kn = k_from_n(&args);
+        // max_k specifies the maximum number of neighbors to store
+        // (excluding ties); a smaller max_k improves performances, but
+        // its value should be sufficiently large to give correct
+        // results once we've seen all the training data.
+        let max_k = match args.flag_max_k {
+            Some(max_k) => max_k,
+            None => kn(train_x.rows()),
+        };
+
         Estimator::KNN(KNNEstimator::new(&test_x.view(), &test_y.view(),
                                          1, max_k), kn)
     };
