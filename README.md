@@ -137,4 +137,4 @@ Giovanni Cherubin (current maintainer), Konstantinos Chatzikokolakis, Catuscia P
 
 [2] 2018, "F-BLEAU: Practical Channel Leakage Estimation". _Giovanni Cherubin, Konstantinos Chatzikokolakis, Catuscia Palamidessi_.
 
-[3] "Machine Learning methods for Quantifying the Security of Black-boxes". https://giocher.com/pages/bayes.html
+[3] (Blog) "Machine Learning methods for Quantifying the Security of Black-boxes". https://giocher.com/pages/bayes.html
