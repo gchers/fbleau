@@ -5,7 +5,7 @@ F-BLEAU is a tool for estimating the leakage of a system about its secrets in
 a black-box manner (i.e., by only looking at examples of secret inputs and
 respective outputs). It considers a generic system as a black-box, taking
 secret inputs and returning outputs accordingly, and it measures how much the
-outputs "leak" about the inputs.
+outputs "leak" about the inputs. It was proposed in [2].
 
 F-BLEAU is based on the equivalence between estimating the error of a Machine
 Learning model of a specific class and the estimation of information leakage
