@@ -60,13 +60,75 @@ which is based on the error of the NN classifier (1-NN).
 **--knn** Runs the k-NN classifier for a fixed k to be specified.
 Note that this _does not_ guarantee convergence to the Bayes risk.
 
+## Example
+
+This example considers 100K observations generated according to a
+Geometric distribution with privacy level `nu=4` (see [2] for details);
+the true value of the Bayes risk is `R*=0.456` computed analytically.
+The observations are split into training (80%) and test sets
+(`examples/geometric-4.train.csv` and `examples/geometric-4.test.csv`
+respectively).
+
+One can run `fbleau` to compute the `log` estimate as follows:
+
+```console
+$ fbleau log examples/geometric-4.train.csv examples/geometric-4.test.csv
+mapped vectors into 191 unique IDs
+mapped vectors into 191 unique IDs
+Random guessing error: 0.913
+Estimating leakage measures...
+
+Final estimate: 0.47475
+Multiplicative Leakage: 6.037356321839082
+Additive Leakage: 0.43825000000000003
+Bayes security measure: 0.5199890470974808
+Min-entropy Leakage: 2.593916950824318
+
+Minimum estimate: 0.47355
+Multiplicative Leakage: 6.051149425287359
+Additive Leakage: 0.43945
+Bayes security measure: 0.5186746987951807
+Min-entropy Leakage: 2.5972092105949125
+```
+
+NOTE: depending on your machine's specs this may take a while.
+`fbleau` is designed to effectively exploit many CPUs, albeit with low RAM requirements;
+further optimisations are in the works.
+
+One should look at the `Minimum estimate` (i.e., the minimum value that
+the Bayes risk estimate took as the size of the training examples increases),
+rather than at the `Final estimate`: indeed, the estimates do not guarantee
+a monotonically decreasing behaviour.
+
+For the `frequentist` estimate:
+
+```console
+$ fbleau frequentist examples/geometric-4.train.csv examples/geometric-4.test.csv
+mapped vectors into 191 unique IDs
+mapped vectors into 191 unique IDs
+Random guessing error: 0.913
+Estimating leakage measures...
+
+Final estimate: 0.5621
+Multiplicative Leakage: 5.033333333333335
+Additive Leakage: 0.3509
+Bayes security measure: 0.6156626506024097
+Min-entropy Leakage: 2.3315141437165607
+
+Minimum estimate: 0.56205
+Multiplicative Leakage: 5.033908045977013
+Additive Leakage: 0.35095
+Bayes security measure: 0.6156078860898139
+Min-entropy Leakage: 2.3316788631368333
+```
+
 ## Further options
 
 It is often useful to know the value of an estimate at every step
 (i.e., for training size 1, 2, ...).
 `fbleau` can output this into a file specified by `--verbose=<logfile>`.
 
-By default, `fbleau` runs for all trainng data.
+By default, `fbleau` runs for all training data.
 However, one can specify a stopping criterion, in the form of a
 (delta, q)-convergence: `fbleau` stops when the estimate's value has
 not changed more than delta (`--delta`), either in relative (default) or
@@ -126,10 +188,6 @@ Currently, the code provided here:
 - [ ] other ML methods (e.g., SVM, neural network)
 - [ ] Python and Java bindings
 
-
-# Authors
-
-Giovanni Cherubin (current maintainer), Konstantinos Chatzikokolakis, Catuscia Palamidessi.
 
 # References
 
