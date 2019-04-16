@@ -267,7 +267,8 @@ fn run_forward_strategy(mut estimator: Estimator, compute_nn_bound: bool,
 fn main() {
     // Parse args from command line.
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.deserialize())
+                            .and_then(|d| d.version(Some(env!("CARGO_PKG_VERSION").to_string()))
+                                           .deserialize())
                             .unwrap_or_else(|e| e.exit());
 
     // Number of processes.
