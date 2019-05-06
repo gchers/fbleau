@@ -5,6 +5,7 @@ extern crate ndarray;
 extern crate itertools;
 extern crate ndarray_parallel;
 extern crate ordered_float;
+extern crate strsim;
 
 pub mod estimates;
 
