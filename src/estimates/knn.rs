@@ -39,7 +39,8 @@
 //! 
 //! let k = 3;
 //! let mut knn = KNNEstimator::from_data(&train_x.view(), &train_y.view(),
-//!                             &test_x.view(), &test_y.view(), k, max_k);
+//!                             &test_x.view(), &test_y.view(), k, max_k,
+//!                             euclidean_distance);
 //!
 //! assert_eq!(knn.get_error(), 0.42857142857142855);
 //!
