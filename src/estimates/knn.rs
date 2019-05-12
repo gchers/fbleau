@@ -690,7 +690,7 @@ mod tests {
 
         assert_eq!(knn1.predict(1), Ok(2));
 
-        knn1.add_example(&array![2., 1.].view(), 2, distance);
+        knn1.add_example(&array![2., 1.].view(), 2);
 
         assert_eq!(knn1.predict(1), Ok(2));
         assert_eq!(knn1.predict(3), Ok(2));
@@ -730,7 +730,7 @@ mod tests {
                                     Err(()), Err(()), Ok(0), Ok(1)];
 
         for (i, (x, y)) in train_x.outer_iter().zip(train_y.iter()).enumerate() {
-            knn.add_example(&x, *y, distance);
+            knn.add_example(&x, *y);
             assert_eq!(knn.predict(1), expected_preds_1[i]);
             assert_eq!(knn.predict(3), expected_preds_3[i]);
             assert_eq!(knn.predict(5), expected_preds_5[i]);
@@ -784,7 +784,7 @@ mod tests {
         // [6, 5, 5, 4, 4, 3, 3]
 
         for (i, (x, y)) in train_x.outer_iter().zip(train_y.iter()).enumerate() {
-            knn.add_example(&x, *y, distance).unwrap();
+            knn.add_example(&x, *y).unwrap();
             assert_eq!(knn.predictions, expected_preds[expected_preds.len()-1-i]);
             assert_eq!(knn.get_error(), expected_error[expected_error.len()-1-i]);
         }
@@ -811,7 +811,7 @@ mod tests {
 
         for (i, (x, y)) in train_x.outer_iter().zip(train_y.iter()).enumerate() {
             knn.set_k(ks[i]).unwrap();
-            knn.add_example(&x, *y, distance).unwrap();
+            knn.add_example(&x, *y).unwrap();
             assert_eq!(knn.get_error(), expected_error[i]);
             assert_eq!(knn.predictions, expected_preds[i]);
         }
@@ -845,11 +845,11 @@ mod tests {
         assert!(nn.predict(6).is_err());
 
         // Test ties count again.
-        nn.add_example(&array![1.].view(), 0, distance);
-        nn.add_example(&array![1.].view(), 1, distance);
-        nn.add_example(&array![1.].view(), 2, distance);
-        nn.add_example(&array![1.].view(), 2, distance);
-        nn.add_example(&array![1.].view(), 3, distance);
+        nn.add_example(&array![1.].view(), 0);
+        nn.add_example(&array![1.].view(), 1);
+        nn.add_example(&array![1.].view(), 2);
+        nn.add_example(&array![1.].view(), 2);
+        nn.add_example(&array![1.].view(), 3);
 
         assert_eq!(nn.extra_ties.get(&0), Some(&4));
         assert_eq!(nn.extra_ties.get(&1), Some(&2));
@@ -873,7 +873,6 @@ mod tests {
         let k = 1;
         let max_k = 5;  // Essential that max_k > k for this test, otherwise
                         // it's a different check.
-        let distance = euclidean_distance;
 
         let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(), k,
                                         max_k, euclidean_distance);
@@ -883,7 +882,7 @@ mod tests {
 
         // First all with label 0.
         for _ in 0..5 {
-            knn.add_example(&array![2.].view(), 0, distance).unwrap();
+            knn.add_example(&array![2.].view(), 0).unwrap();
             println!("asdf");
         }
 
@@ -891,7 +890,7 @@ mod tests {
 
         // Now we change the ties' label distribution to 1.
         for _ in 0..6 {
-            knn.add_example(&array![2.].view(), 1, distance).unwrap();
+            knn.add_example(&array![2.].view(), 1).unwrap();
             println!("asdf");
         }
 
