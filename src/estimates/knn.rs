@@ -176,7 +176,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
             assert!(*yi != std::usize::MAX,
                     "label {} is too large and currently not supported", *yi);
 
-            knn.add_example(&xi, *yi, distance);
+            knn.add_example(&xi, *yi);
         }
 
         knn
@@ -336,8 +336,8 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
     }
 
     /// Adds a new example.
-    fn add_example(&mut self, x: &ArrayView1<f64>, y: Label, distance: D) -> bool {
-        let d = distance(x, &self.x.view());
+    fn add_example(&mut self, x: &ArrayView1<f64>, y: Label) -> bool {
+        let d = (self.distance)(x, &self.x.view());
 
         if self.neighbors.len() < self.max_k {
             // If still filling, insert sorted.
@@ -521,7 +521,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         Ok(())
     }
 
-    pub fn add_example(&mut self, x: &ArrayView1<f64>, y: Label, distance: D) -> Result<(), ()> {
+    pub fn add_example(&mut self, x: &ArrayView1<f64>, y: Label) -> Result<(), ()> {
         // We copy because we're using them in the closure below.
         let current_k = self.current_k;
         self.n += 1;    // NOTE: need to update here, before possible errors.
@@ -540,7 +540,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
             // I could not find a better way to catch and return the
             // errors within iter(), but maybe there's a better way.
             .filter_map(|(((neigh, true_y), old_pred), old_error)| {
-                if neigh.add_example(x, y, distance) {
+                if neigh.add_example(x, y) {
                     if neigh.updated_k > current_k {
                         return None;
                     }
