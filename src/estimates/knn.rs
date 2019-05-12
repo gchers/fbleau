@@ -595,6 +595,7 @@ where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use estimates::*;
 
     #[test]
     fn knn_init() {
@@ -611,7 +612,8 @@ mod tests {
         let mut max_k = 8;
         
         let knn = NearestNeighbors::from_data(&x.view(), &train_x.view(),
-                                        &train_y.view(), max_k);
+                                        &train_y.view(), max_k,
+                                        euclidean_distance);
         
         let distances_from_x: Vec<_> = knn.neighbors.iter()
                                             .map(|neigh| neigh.distance)
@@ -621,7 +623,8 @@ mod tests {
         // Reduce max_k.
         max_k = 5;
         let knn = NearestNeighbors::from_data(&x.view(), &train_x.view(),
-                                        &train_y.view(), max_k);
+                                        &train_y.view(), max_k,
+                                        euclidean_distance);
         
         let distances_from_x: Vec<_> = knn.neighbors.iter()
                                             .map(|neigh| neigh.distance)
@@ -638,7 +641,8 @@ mod tests {
         let max_k = 10;
 
         let knn = NearestNeighbors::from_data(&x.view(), &train_x.view(),
-                                        &train_y.view(), max_k);
+                                        &train_y.view(), max_k,
+                                        euclidean_distance);
 
         assert_eq!(knn.predict(1), Ok(0));
         assert_eq!(knn.predict(3), Ok(1));
@@ -650,7 +654,8 @@ mod tests {
         let train_y = array![0, 1, 1, 1, 0, 1, 0, 0, 0];
 
         let knn = NearestNeighbors::from_data(&x.view(), &train_x.view(),
-                                        &train_y.view(), max_k);
+                                        &train_y.view(), max_k,
+                                        euclidean_distance);
 
         assert_eq!(knn.predict(1), Ok(0));
         assert_eq!(knn.predict(3), Ok(1));
@@ -674,12 +679,14 @@ mod tests {
         let x2 = array![2., 2.];
 
         let max_k = 10;
-        let distance = estimates::euclidean_distance;
+        let distance = euclidean_distance;
 
         let mut knn1 = NearestNeighbors::from_data(&x1.view(), &train_x.view(),
-                                                   &train_y.view(), max_k);
+                                                   &train_y.view(), max_k,
+                                                   distance);
         let knn2 = NearestNeighbors::from_data(&x2.view(), &train_x.view(),
-                                              &train_y.view(), max_k);
+                                              &train_y.view(), max_k,
+                                              distance);
 
         assert_eq!(knn1.predict(1), Ok(2));
 
@@ -707,10 +714,10 @@ mod tests {
         let train_y = array![0, 0, 0, 1, 0, 1, 1, 2];
         let x = array![0.];
         let max_k = 8;
-        let distance = estimates::euclidean_distance;
+        let distance = euclidean_distance;
 
         // NNs of x.
-        let mut knn = NearestNeighbors::new(&x.view(), max_k);
+        let mut knn = NearestNeighbors::new(&x.view(), max_k, distance);
 
 
         let expected_preds_1 = vec![Ok(0), Ok(0), Ok(0), Ok(1), Ok(0), Ok(1),
@@ -751,11 +758,12 @@ mod tests {
                             [5.]];
         let test_y = array![0, 0, 2, 1, 0, 1, 0];
         let max_k = 8;
-        let distance = estimates::euclidean_distance;
+        let distance = euclidean_distance;
 
         // Test for k = 1.
         let k = 1;
-        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(), k, max_k);
+        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(), k,
+                                        max_k, distance);
 
         // FIXME: I'm not sure why in this case, differently from the
         // backward test, I need to include one more error and prediction.
@@ -784,7 +792,8 @@ mod tests {
         // Test when changing k.
         let k = 1;
         let max_k = train_y.len();
-        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(), k, max_k);
+        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(), k,
+                                        max_k, distance);
         let expected_error = vec![0.42857142857142855, 0.42857142857142855,
                                   0.42857142857142855, 0.5714285714285714,
                                   0.42857142857142855, 0.42857142857142855,
@@ -811,14 +820,15 @@ mod tests {
     #[test]
     fn ties_after_max_k() {
         let max_k = 5;
-        let distance = estimates::euclidean_distance;
+        let distance = euclidean_distance;
 
         let train_x = array![[0.], [0.], [0.], [1.], [1.], [1.], [1.], [1.], [0.]];
         let train_y = array![0, 1, 1, 1, 0, 0, 0, 0, 1];
 
         let x = array![0.];
         let mut nn = NearestNeighbors::from_data(&x.view(), &train_x.view(),
-                                                 &train_y.view(), max_k);
+                                                 &train_y.view(), max_k,
+                                                 distance);
         let distances_from_x: Vec<_> = nn.neighbors.iter()
                                             .map(|neigh| neigh.distance)
                                             .collect();
@@ -849,7 +859,8 @@ mod tests {
         // Different labels.
         let train_y = array![0, 0, 1, 1, 0, 0, 0, 0, 1];
         let nn = NearestNeighbors::from_data(&x.view(), &train_x.view(),
-                                             &train_y.view(), max_k);
+                                             &train_y.view(), max_k,
+                                             euclidean_distance);
         assert_eq!(nn.predict(5).unwrap(), 0);
     }
 
@@ -862,9 +873,10 @@ mod tests {
         let k = 1;
         let max_k = 5;  // Essential that max_k > k for this test, otherwise
                         // it's a different check.
-        let distance = estimates::euclidean_distance;
+        let distance = euclidean_distance;
 
-        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(), k, max_k);
+        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(), k,
+                                        max_k, euclidean_distance);
 
         // We'll only observe examples with distance 2 from x.
         println!("asdf");
