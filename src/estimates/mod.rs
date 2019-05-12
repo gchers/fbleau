@@ -1,3 +1,5 @@
+//! This module implements Bayes risk estimates, and heuristics for
+//! evaluating convergence.
 pub mod knn;
 pub mod frequentist;
 pub mod convergence;
