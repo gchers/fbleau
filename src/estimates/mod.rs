@@ -9,12 +9,17 @@ pub use self::convergence::ForwardChecker;
 use Label;
 use ndarray::prelude::*;
 
-pub enum Estimator {
-    KNN(KNNEstimator, Box<Fn(usize) -> usize>),
+use strsim::generic_levenshtein;
+
+/// A wrapper around estimators (e.g., frequentist/k-NN).
+pub enum Estimator<D>
+where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
+    KNN(KNNEstimator<D>, Box<Fn(usize) -> usize>),
     Frequentist(FrequentistEstimator),
 }
 
-impl Estimator {
+impl<D> Estimator<D>
+where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     /// Inserts a new example in the training data, and returns
     /// the current error estimate.
     pub fn next(&mut self, n: usize, x: &ArrayView1<f64>, y: Label) -> Result<f64, ()> {
@@ -49,10 +54,15 @@ fn some_or_error<T>(opt: Option<T>) -> Result<T, ()> {
 }
 
 /// Returns the Euclidean distance between two vectors of f64 values.
-fn euclidean_distance(v1: &ArrayView1<f64>, v2: &ArrayView1<f64>) -> f64 {
+pub fn euclidean_distance(v1: &ArrayView1<f64>, v2: &ArrayView1<f64>) -> f64 {
     v1.iter()
       .zip(v2.iter())
       .map(|(x,y)| (x - y).powi(2))
       .sum::<f64>()
       .sqrt()
+}
+
+/// Returns the Levenshtein distance between two vectors of f64 values.
+pub fn levenshtein_distance(v1: &ArrayView1<f64>, v2: &ArrayView1<f64>) -> f64 {
+    generic_levenshtein(v1, v2) as f64
 }
