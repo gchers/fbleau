@@ -11,6 +11,7 @@ use ndarray::prelude::*;
 
 use strsim::generic_levenshtein;
 
+/// A wrapper around estimators (e.g., frequentist/k-NN).
 pub enum Estimator<D>
 where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
     KNN(KNNEstimator<D>, Box<Fn(usize) -> usize>),
