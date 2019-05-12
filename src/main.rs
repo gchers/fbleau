@@ -82,6 +82,7 @@ extern crate itertools;
 extern crate ndarray_parallel;
 
 extern crate fbleau;
+extern crate strsim;
 
 mod utils;
 mod security_measures;
@@ -97,6 +98,8 @@ use fbleau::estimates::*;
 use security_measures::*;
 use utils::{load_data, vectors_to_ids, scale01, estimate_random_guessing};
 
+//use estimates::euclidean_distance;
+//use estimates::levenshtein_distance;
 
 const USAGE: &'static str = "
 Estimate k-NN error and convergence.
@@ -124,6 +127,7 @@ Options:
                                 dimensions).
     --nprocs=<n>                Number of threads to spawn. By default it is
                                 the number of available CPUs.
+    --distance=<name>           Distance metric
     -h, --help                  Show help.
     --version                   Show the version.
 ";
@@ -142,6 +146,7 @@ struct Args {
     flag_absolute: bool,
     flag_scale: bool,
     flag_nprocs: Option<usize>,
+    flag_distance: Option<String>,
     arg_train: String,
     arg_test: String,
 }
@@ -208,10 +213,11 @@ fn print_all_measures(bayes_risk_estimate: f64, random_guessing: f64) {
 
 /// Estimates security measures with a forward strategy (i.e., with an
 /// increasing number of examples).
-fn run_forward_strategy(mut estimator: Estimator, compute_nn_bound: bool,
+fn run_forward_strategy<F>(mut estimator: Estimator<F>, compute_nn_bound: bool,
                         nlabels: usize, mut convergence_checker: Option<ForwardChecker>,
                         verbose: Option<String>, train_x: Array2<f64>,
-                        train_y: Array1<Label>) -> (f64, f64) {
+                        train_y: Array1<Label>, distance: F) -> (f64, f64)
+                        where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     // Init verbose log file.
     let mut logfile = if let Some(fname) = verbose {
         let mut logfile = File::create(&fname)
@@ -228,7 +234,7 @@ fn run_forward_strategy(mut estimator: Estimator, compute_nn_bound: bool,
 
     for (n, (x, y)) in train_x.outer_iter().zip(train_y.iter()).enumerate() {
         // Compute error.
-        last_error = match estimator.next(n, &x, *y) {
+        last_error = match estimator.next(n, &x, *y, distance) {
             Ok(error) => error,
             Err(_) => {
                 // TODO: this error is specific to k-NN. If we add new
@@ -329,6 +335,13 @@ fn main() {
         scale01(&mut test_x);
     }
 
+    let distance = match args.flag_distance.as_ref().map(String::as_ref) {
+        Some("euclidean") => fbleau::estimates::euclidean_distance,
+        Some("levenshtein") => fbleau::estimates::levenshtein_distance,
+        Some(_) => fbleau::estimates::euclidean_distance,
+        None => fbleau::estimates::euclidean_distance
+    };
+
     // Init estimator.
     let estimator = if args.cmd_frequentist {
         Estimator::Frequentist(FrequentistEstimator::new(nlabels,
@@ -347,7 +360,7 @@ fn main() {
         };
 
         Estimator::KNN(KNNEstimator::new(&test_x.view(), &test_y.view(),
-                                         1, max_k), kn)
+                                         1, max_k, distance), kn)
     };
 
     let random_guessing = estimate_random_guessing(&test_y.view());
@@ -357,7 +370,7 @@ fn main() {
     let (min_error, last_error) = run_forward_strategy(estimator, args.cmd_nn_bound,
                                                        nlabels, convergence_checker,
                                                        args.flag_verbose, train_x,
-                                                       train_y);
+                                                       train_y, distance);
 
     println!();
     println!("Final estimate: {}", last_error);

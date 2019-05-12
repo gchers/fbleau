@@ -64,8 +64,6 @@ use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
 
 use Label;
-use estimates::euclidean_distance;
-
 
 /// Nearest neighbors to a test object.
 #[derive(Debug)]
@@ -113,7 +111,8 @@ impl Eq for Neighbor {}
 
 /// Contains the nearest neighbors of some test object x.
 #[derive(Debug)]
-struct NearestNeighbors {
+struct NearestNeighbors<F>
+where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
     // Test object x.
     x: Array1<f64>,
     // List of neighbors, sorted in increasing order by their distance
@@ -135,11 +134,13 @@ struct NearestNeighbors {
     updated_k: usize,
     // Maximum number of neighbors (excluding extra_ties).
     max_k: usize,
+    distance: F,
 }
 
-impl NearestNeighbors {
+impl<F> NearestNeighbors<F>
+where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
     /// Init a list of neighbors for a specified test object x.
-    fn new(x: &ArrayView1<f64>, max_k: usize) -> NearestNeighbors {
+    fn new(x: &ArrayView1<f64>, max_k: usize, distance: F) -> NearestNeighbors<F> {
         NearestNeighbors {
             x: x.to_owned(),
             // Capacity: max_k + 1 for when we insert a new element and then
@@ -149,6 +150,7 @@ impl NearestNeighbors {
             extra_ties_dist: None,
             updated_k: 0,
             max_k: max_k,
+            distance: distance,
         }
     }
 
@@ -162,10 +164,10 @@ impl NearestNeighbors {
     /// * `max_k` - Maximum number of neighbors to store for test object x.
     ///
     fn from_data(x: &ArrayView1<f64>, train_x: &ArrayView2<f64>,
-                 train_y: &ArrayView1<Label>, max_k: usize) -> NearestNeighbors {
+                 train_y: &ArrayView1<Label>, max_k: usize, distance: F) -> NearestNeighbors<F> {
         assert!(max_k > 0);
 
-        let mut knn = NearestNeighbors::new(x, max_k);
+        let mut knn = NearestNeighbors::new(x, max_k, distance);
 
         for (xi, yi) in train_x.outer_iter().zip(train_y) {
             // NOTE: we use std::usize::MAX as a bogus label to split ties in
@@ -174,7 +176,7 @@ impl NearestNeighbors {
             assert!(*yi != std::usize::MAX,
                     "label {} is too large and currently not supported", *yi);
 
-            knn.add_example(&xi, *yi);
+            knn.add_example(&xi, *yi, distance);
         }
 
         knn
@@ -334,10 +336,10 @@ impl NearestNeighbors {
     }
 
     /// Adds a new example.
-    fn add_example(&mut self, x: &ArrayView1<f64>, y: Label) -> bool {
-        let d = euclidean_distance(x, &self.x.view());
+    fn add_example(&mut self, x: &ArrayView1<f64>, y: Label, distance: F) -> bool {
+	let d = distance(x, &self.x.view());
 
-        if self.neighbors.len() < self.max_k {
+	if self.neighbors.len() < self.max_k {
             // If still filling, insert sorted.
             let new = Neighbor::new(d, y);
             let pos = self.neighbors.binary_search(&new).unwrap_or_else(|e| e);
@@ -402,9 +404,10 @@ impl NearestNeighbors {
 /// Keeps track of the error of a k-NN classifier, with the possibility
 /// of changing k and removing training examples.
 #[derive(Debug)]
-pub struct KNNEstimator {
+pub struct KNNEstimator<F>
+where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
     // max_k nearest neighbors for each test object.
-    neighbors: Vec<NearestNeighbors>,
+    neighbors: Vec<NearestNeighbors<F>>,
     // Error for each test object.
     pub errors: Vec<f64>,
     // Current prediction for each test label.
@@ -421,16 +424,17 @@ pub struct KNNEstimator {
     n: usize,
 }
 
-impl KNNEstimator {
+impl<F> KNNEstimator<F>
+where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     /// Create a new k-NN estimator.
     pub fn new(test_x: &ArrayView2<f64>, test_y: &ArrayView1<Label>,
-           k: usize, max_k: usize) -> KNNEstimator {
+           k: usize, max_k: usize, distance: F) -> KNNEstimator<F> {
         assert_eq!(test_x.rows(), test_y.len());
         assert!(test_y.len() > 0);
 
         let neighbors = test_x.outer_iter()
                               .into_par_iter()
-                              .map(|x| NearestNeighbors::new(&x, max_k))
+                              .map(|x| NearestNeighbors::new(&x, max_k, distance))
                               .collect::<Vec<_>>();
         // We initially set all predictions to 0. Therefore, we need to
         // adjust the error count accordingly. Note that this is updated as
@@ -456,7 +460,7 @@ impl KNNEstimator {
     /// Create a k-NN estimator from training and test set.
     pub fn from_data(train_x: &ArrayView2<f64>, train_y: &ArrayView1<Label>,
            test_x: &ArrayView2<f64>, test_y: &ArrayView1<Label>,
-           k: usize, max_k: usize) -> KNNEstimator {
+           k: usize, max_k: usize, distance: F) -> KNNEstimator<F> {
         assert_eq!(train_x.cols(), test_x.cols());
         assert_eq!(train_x.rows(), train_y.len());
         assert_eq!(test_x.rows(), test_y.len());
@@ -468,7 +472,8 @@ impl KNNEstimator {
                             .map(|x| NearestNeighbors::from_data(&x,
                                                            &train_x.view(),
                                                            &train_y.view(),
-                                                           max_k))
+                                                           max_k,
+                                                           distance))
                             .collect::<Vec<_>>();
 
         let mut knn_error = 0.;
@@ -516,7 +521,7 @@ impl KNNEstimator {
         Ok(())
     }
 
-    pub fn add_example(&mut self, x: &ArrayView1<f64>, y: Label) -> Result<(), ()> {
+    pub fn add_example(&mut self, x: &ArrayView1<f64>, y: Label, distance: F) -> Result<(), ()> {
         // We copy because we're using them in the closure below.
         let current_k = self.current_k;
         self.n += 1;    // NOTE: need to update here, before possible errors.
@@ -535,7 +540,7 @@ impl KNNEstimator {
             // I could not find a better way to catch and return the
             // errors within iter(), but maybe there's a better way.
             .filter_map(|(((neigh, true_y), old_pred), old_error)| {
-                if neigh.add_example(x, y) {
+                if neigh.add_example(x, y, distance) {
                     if neigh.updated_k > current_k {
                         return None;
                     }
@@ -669,6 +674,7 @@ mod tests {
         let x2 = array![2., 2.];
 
         let max_k = 10;
+        let distance = estimates::euclidean_distance;
 
         let mut knn1 = NearestNeighbors::from_data(&x1.view(), &train_x.view(),
                                                    &train_y.view(), max_k);
@@ -677,7 +683,7 @@ mod tests {
 
         assert_eq!(knn1.predict(1), Ok(2));
 
-        knn1.add_example(&array![2., 1.].view(), 2);
+        knn1.add_example(&array![2., 1.].view(), 2, distance);
 
         assert_eq!(knn1.predict(1), Ok(2));
         assert_eq!(knn1.predict(3), Ok(2));
@@ -701,6 +707,7 @@ mod tests {
         let train_y = array![0, 0, 0, 1, 0, 1, 1, 2];
         let x = array![0.];
         let max_k = 8;
+        let distance = estimates::euclidean_distance;
 
         // NNs of x.
         let mut knn = NearestNeighbors::new(&x.view(), max_k);
@@ -716,7 +723,7 @@ mod tests {
                                     Err(()), Err(()), Ok(0), Ok(1)];
 
         for (i, (x, y)) in train_x.outer_iter().zip(train_y.iter()).enumerate() {
-            knn.add_example(&x, *y);
+            knn.add_example(&x, *y, distance);
             assert_eq!(knn.predict(1), expected_preds_1[i]);
             assert_eq!(knn.predict(3), expected_preds_3[i]);
             assert_eq!(knn.predict(5), expected_preds_5[i]);
@@ -744,6 +751,8 @@ mod tests {
                             [5.]];
         let test_y = array![0, 0, 2, 1, 0, 1, 0];
         let max_k = 8;
+        let distance = estimates::euclidean_distance;
+
         // Test for k = 1.
         let k = 1;
         let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(), k, max_k);
@@ -767,7 +776,7 @@ mod tests {
         // [6, 5, 5, 4, 4, 3, 3]
 
         for (i, (x, y)) in train_x.outer_iter().zip(train_y.iter()).enumerate() {
-            knn.add_example(&x, *y).unwrap();
+            knn.add_example(&x, *y, distance).unwrap();
             assert_eq!(knn.predictions, expected_preds[expected_preds.len()-1-i]);
             assert_eq!(knn.get_error(), expected_error[expected_error.len()-1-i]);
         }
@@ -793,7 +802,7 @@ mod tests {
 
         for (i, (x, y)) in train_x.outer_iter().zip(train_y.iter()).enumerate() {
             knn.set_k(ks[i]).unwrap();
-            knn.add_example(&x, *y).unwrap();
+            knn.add_example(&x, *y, distance).unwrap();
             assert_eq!(knn.get_error(), expected_error[i]);
             assert_eq!(knn.predictions, expected_preds[i]);
         }
@@ -802,6 +811,7 @@ mod tests {
     #[test]
     fn ties_after_max_k() {
         let max_k = 5;
+        let distance = estimates::euclidean_distance;
 
         let train_x = array![[0.], [0.], [0.], [1.], [1.], [1.], [1.], [1.], [0.]];
         let train_y = array![0, 1, 1, 1, 0, 0, 0, 0, 1];
@@ -825,11 +835,11 @@ mod tests {
         assert!(nn.predict(6).is_err());
 
         // Test ties count again.
-        nn.add_example(&array![1.].view(), 0);
-        nn.add_example(&array![1.].view(), 1);
-        nn.add_example(&array![1.].view(), 2);
-        nn.add_example(&array![1.].view(), 2);
-        nn.add_example(&array![1.].view(), 3);
+        nn.add_example(&array![1.].view(), 0, distance);
+        nn.add_example(&array![1.].view(), 1, distance);
+        nn.add_example(&array![1.].view(), 2, distance);
+        nn.add_example(&array![1.].view(), 2, distance);
+        nn.add_example(&array![1.].view(), 3, distance);
 
         assert_eq!(nn.extra_ties.get(&0), Some(&4));
         assert_eq!(nn.extra_ties.get(&1), Some(&2));
@@ -852,6 +862,8 @@ mod tests {
         let k = 1;
         let max_k = 5;  // Essential that max_k > k for this test, otherwise
                         // it's a different check.
+        let distance = estimates::euclidean_distance;
+
         let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(), k, max_k);
 
         // We'll only observe examples with distance 2 from x.
@@ -859,7 +871,7 @@ mod tests {
 
         // First all with label 0.
         for _ in 0..5 {
-            knn.add_example(&array![2.].view(), 0).unwrap();
+            knn.add_example(&array![2.].view(), 0, distance).unwrap();
             println!("asdf");
         }
 
@@ -867,7 +879,7 @@ mod tests {
 
         // Now we change the ties' label distribution to 1.
         for _ in 0..6 {
-            knn.add_example(&array![2.].view(), 1).unwrap();
+            knn.add_example(&array![2.].view(), 1, distance).unwrap();
             println!("asdf");
         }
 
