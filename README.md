@@ -140,6 +140,14 @@ in the `[0,1]` interval by specifying the `--scale` flag.
 By default, `fbleau` uses a number of threads equal to the number of CPUs.
 To limit this number, you can use `--nprocs`.
 
+An option `--distance` is available to select the desired distance metric
+for nearest neighbor methods.
+
+Further options are shown in the help page:
+```console
+fbleau -h
+```
+
 # Install
 
 The code is written in `Rust`, but it is thought to be used as a
