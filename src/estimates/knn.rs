@@ -337,9 +337,9 @@ where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
 
     /// Adds a new example.
     fn add_example(&mut self, x: &ArrayView1<f64>, y: Label, distance: F) -> bool {
-	let d = distance(x, &self.x.view());
+        let d = distance(x, &self.x.view());
 
-	if self.neighbors.len() < self.max_k {
+        if self.neighbors.len() < self.max_k {
             // If still filling, insert sorted.
             let new = Neighbor::new(d, y);
             let pos = self.neighbors.binary_search(&new).unwrap_or_else(|e| e);
