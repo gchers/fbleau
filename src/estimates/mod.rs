@@ -21,11 +21,11 @@ impl<D> Estimator<D>
 where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     /// Inserts a new example in the training data, and returns
     /// the current error estimate.
-    pub fn next(&mut self, n: usize, x: &ArrayView1<f64>, y: Label, distance: D) -> Result<f64, ()> {
+    pub fn next(&mut self, n: usize, x: &ArrayView1<f64>, y: Label) -> Result<f64, ()> {
         match self {
             &mut Estimator::KNN(ref mut estimator, ref kn) => {
                 estimator.set_k(kn(n))?;
-                estimator.add_example(x, y, distance)?;
+                estimator.add_example(x, y)?;
                 Ok(estimator.get_error())
             },
             &mut Estimator::Frequentist(ref mut estimator) => {

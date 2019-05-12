@@ -216,7 +216,7 @@ fn print_all_measures(bayes_risk_estimate: f64, random_guessing: f64) {
 fn run_forward_strategy<F>(mut estimator: Estimator<F>, compute_nn_bound: bool,
                         nlabels: usize, mut convergence_checker: Option<ForwardChecker>,
                         verbose: Option<String>, train_x: Array2<f64>,
-                        train_y: Array1<Label>, distance: F) -> (f64, f64)
+                        train_y: Array1<Label>) -> (f64, f64)
                         where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     // Init verbose log file.
     let mut logfile = if let Some(fname) = verbose {
@@ -234,7 +234,7 @@ fn run_forward_strategy<F>(mut estimator: Estimator<F>, compute_nn_bound: bool,
 
     for (n, (x, y)) in train_x.outer_iter().zip(train_y.iter()).enumerate() {
         // Compute error.
-        last_error = match estimator.next(n, &x, *y, distance) {
+        last_error = match estimator.next(n, &x, *y) {
             Ok(error) => error,
             Err(_) => {
                 // TODO: this error is specific to k-NN. If we add new
@@ -370,7 +370,7 @@ fn main() {
     let (min_error, last_error) = run_forward_strategy(estimator, args.cmd_nn_bound,
                                                        nlabels, convergence_checker,
                                                        args.flag_verbose, train_x,
-                                                       train_y, distance);
+                                                       train_y);
 
     println!();
     println!("Final estimate: {}", last_error);
