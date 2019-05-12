@@ -16,15 +16,15 @@ fn change(a: f64, b: f64, relative: bool) -> f64 {
     }
 }
 
-//! `ForwardChecker` should be used for checking convergence of
-//! estimates in a "forward" direction (i.e., when one training example
-//! is _added_ each time).
-//!
-//! It allows checking for relative or absolute convergence:
-//! we declare convergence if an estimate did not change (in relative
-//! or absolute sense) more than some `delta` for at least `q` steps.
-//! `ForwardChecker` allows measuring `delta`-convergence for several
-//! values of `delta`.
+/// `ForwardChecker` should be used for checking convergence of
+/// estimates in a "forward" direction (i.e., when one training example
+/// is _added_ each time).
+///
+/// It allows checking for relative or absolute convergence:
+/// we declare convergence if an estimate did not change (in relative
+/// or absolute sense) more than some `delta` for at least `q` steps.
+/// `ForwardChecker` allows measuring `delta`-convergence for several
+/// values of `delta`.
 pub struct ForwardChecker {
     // A double-ended queue keeping track of all the estimates for which
     // next_delta-convergence happens.
