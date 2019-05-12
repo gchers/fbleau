@@ -111,8 +111,8 @@ impl Eq for Neighbor {}
 
 /// Contains the nearest neighbors of some test object x.
 #[derive(Debug)]
-struct NearestNeighbors<F>
-where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
+struct NearestNeighbors<D>
+where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
     // Test object x.
     x: Array1<f64>,
     // List of neighbors, sorted in increasing order by their distance
@@ -134,13 +134,13 @@ where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
     updated_k: usize,
     // Maximum number of neighbors (excluding extra_ties).
     max_k: usize,
-    distance: F,
+    distance: D,
 }
 
-impl<F> NearestNeighbors<F>
-where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
+impl<D> NearestNeighbors<D>
+where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
     /// Init a list of neighbors for a specified test object x.
-    fn new(x: &ArrayView1<f64>, max_k: usize, distance: F) -> NearestNeighbors<F> {
+    fn new(x: &ArrayView1<f64>, max_k: usize, distance: D) -> NearestNeighbors<D> {
         NearestNeighbors {
             x: x.to_owned(),
             // Capacity: max_k + 1 for when we insert a new element and then
@@ -164,7 +164,7 @@ where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
     /// * `max_k` - Maximum number of neighbors to store for test object x.
     ///
     fn from_data(x: &ArrayView1<f64>, train_x: &ArrayView2<f64>,
-                 train_y: &ArrayView1<Label>, max_k: usize, distance: F) -> NearestNeighbors<F> {
+                 train_y: &ArrayView1<Label>, max_k: usize, distance: D) -> NearestNeighbors<D> {
         assert!(max_k > 0);
 
         let mut knn = NearestNeighbors::new(x, max_k, distance);
@@ -336,7 +336,7 @@ where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
     }
 
     /// Adds a new example.
-    fn add_example(&mut self, x: &ArrayView1<f64>, y: Label, distance: F) -> bool {
+    fn add_example(&mut self, x: &ArrayView1<f64>, y: Label, distance: D) -> bool {
         let d = distance(x, &self.x.view());
 
         if self.neighbors.len() < self.max_k {
@@ -404,10 +404,10 @@ where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
 /// Keeps track of the error of a k-NN classifier, with the possibility
 /// of changing k and removing training examples.
 #[derive(Debug)]
-pub struct KNNEstimator<F>
-where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
+pub struct KNNEstimator<D>
+where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
     // max_k nearest neighbors for each test object.
-    neighbors: Vec<NearestNeighbors<F>>,
+    neighbors: Vec<NearestNeighbors<D>>,
     // Error for each test object.
     pub errors: Vec<f64>,
     // Current prediction for each test label.
@@ -424,11 +424,11 @@ where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
     n: usize,
 }
 
-impl<F> KNNEstimator<F>
-where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
+impl<D> KNNEstimator<D>
+where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     /// Create a new k-NN estimator.
     pub fn new(test_x: &ArrayView2<f64>, test_y: &ArrayView1<Label>,
-           k: usize, max_k: usize, distance: F) -> KNNEstimator<F> {
+           k: usize, max_k: usize, distance: D) -> KNNEstimator<D> {
         assert_eq!(test_x.rows(), test_y.len());
         assert!(test_y.len() > 0);
 
@@ -460,7 +460,7 @@ where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     /// Create a k-NN estimator from training and test set.
     pub fn from_data(train_x: &ArrayView2<f64>, train_y: &ArrayView1<Label>,
            test_x: &ArrayView2<f64>, test_y: &ArrayView1<Label>,
-           k: usize, max_k: usize, distance: F) -> KNNEstimator<F> {
+           k: usize, max_k: usize, distance: D) -> KNNEstimator<D> {
         assert_eq!(train_x.cols(), test_x.cols());
         assert_eq!(train_x.rows(), train_y.len());
         assert_eq!(test_x.rows(), test_y.len());
@@ -521,7 +521,7 @@ where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         Ok(())
     }
 
-    pub fn add_example(&mut self, x: &ArrayView1<f64>, y: Label, distance: F) -> Result<(), ()> {
+    pub fn add_example(&mut self, x: &ArrayView1<f64>, y: Label, distance: D) -> Result<(), ()> {
         // We copy because we're using them in the closure below.
         let current_k = self.current_k;
         self.n += 1;    // NOTE: need to update here, before possible errors.

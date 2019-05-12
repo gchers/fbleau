@@ -11,17 +11,17 @@ use ndarray::prelude::*;
 
 use strsim::generic_levenshtein;
 
-pub enum Estimator<F>
-where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
-    KNN(KNNEstimator<F>, Box<Fn(usize) -> usize>),
+pub enum Estimator<D>
+where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
+    KNN(KNNEstimator<D>, Box<Fn(usize) -> usize>),
     Frequentist(FrequentistEstimator),
 }
 
-impl<F> Estimator<F>
-where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
+impl<D> Estimator<D>
+where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     /// Inserts a new example in the training data, and returns
     /// the current error estimate.
-    pub fn next(&mut self, n: usize, x: &ArrayView1<f64>, y: Label, distance: F) -> Result<f64, ()> {
+    pub fn next(&mut self, n: usize, x: &ArrayView1<f64>, y: Label, distance: D) -> Result<f64, ()> {
         match self {
             &mut Estimator::KNN(ref mut estimator, ref kn) => {
                 estimator.set_k(kn(n))?;
