@@ -30,12 +30,12 @@
 //!
 //! [3] (Blog) "Machine Learning methods for Quantifying the Security of Black-boxes". https://giocher.com/pages/bayes.html
 extern crate csv;
-#[macro_use]
 extern crate ndarray;
 #[macro_use]
 extern crate itertools;
 extern crate ndarray_parallel;
 extern crate ordered_float;
+extern crate float_cmp;
 extern crate strsim;
 
 pub mod estimates;

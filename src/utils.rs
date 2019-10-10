@@ -16,8 +16,8 @@ use fbleau::Label;
 /// The file format should be, for each row:
 ///     label, x1, x2, ...
 /// where x1, x2, ... are features forming a feature vector.
-pub fn load_data<T>(fname: &String)
-        -> Result<(Array2<T>, Array1<Label>), Box<Error>> 
+pub fn load_data<T>(fname: &str)
+        -> Result<(Array2<T>, Array1<Label>), Box<dyn Error>>
         where T: FromStr {
     let mut reader = ReaderBuilder::new()
                                    .has_headers(false)
@@ -36,8 +36,9 @@ pub fn load_data<T>(fname: &String)
                                       .parse::<T>().ok()
                                                      .expect("Failed to parse")));
         targets.push(record[0].parse::<usize>()
-                        .expect(&format!("Could not parse file {}. Error at line: {:?}",
-                                         fname, record)));
+                .unwrap_or_else(|_|
+                    panic!(format!("Could not parse file {}. Error at line: {:?}",
+                                   fname, record))));
 
         if let Some(x) = ncols {
             if x != record.len() - 1 {
@@ -124,7 +125,7 @@ pub fn estimate_random_guessing(labels: &ArrayView1<usize>) -> f64 {
         }
     }
 
-    1. - (max_count as f64) / (labels.len() as f64)
+    1. - f64::from(max_count) / (labels.len() as f64)
 }
 
 

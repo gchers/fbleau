@@ -63,6 +63,7 @@ use std::collections::HashMap;
 use ndarray_parallel::prelude::*;
 use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
+use float_cmp::approx_eq;
 
 use Label;
 
@@ -220,7 +221,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
         let ties_d = self.neighbors[k-1].distance;
         let no_ties = (self.neighbors.len() <= k) || (self.neighbors[k].distance > ties_d);
         // Do self.extra_ties play a part in this prediction?
-        let extra_ties_matter = (self.extra_ties.len() > 0) && (k == self.neighbors.len());
+        let extra_ties_matter = !self.extra_ties.is_empty() && (k == self.neighbors.len());
 
         if no_ties && !extra_ties_matter {
             return self.predict_no_ties(k);
@@ -245,7 +246,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
         const TIES_LABEL: usize = std::usize::MAX;
 
         for (i, neigh) in self.neighbors.iter().enumerate() {
-            if neigh.distance != ties_d {
+            if !approx_eq!(f64, neigh.distance, ties_d) {
                 if i >= k {
                     break;
                 }
@@ -325,7 +326,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
                               .distance;
 
         while let Some(neigh) = self.neighbors.get(i-1) {
-            if neigh.distance != d {
+            if !approx_eq!(f64, neigh.distance, d) {
                 break;
             }
             i -= 1;
@@ -353,7 +354,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
         else if self.neighbors.last().unwrap().distance < d {
             return false;
         }
-        else if self.neighbors.last().unwrap().distance == d {
+        else if approx_eq!(f64, self.neighbors.last().unwrap().distance, d) {
             // Handle ties.
             if self.extra_ties.len() == 0 {
                 self.extra_ties_dist = Some(d);
@@ -379,14 +380,14 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
             if let Some(removed) = self.neighbors.pop() {
                 let last_neigh = self.neighbors.last().unwrap();
                 // Either add to ties, or remove all ties.
-                if last_neigh.distance == removed.distance {
+                if approx_eq!(f64, last_neigh.distance, removed.distance) {
                     //self.ties.push(removed);
                     if self.extra_ties.len() == 0 {
                         self.extra_ties_dist = Some(removed.distance);
                     }
-                    // TODO: could remove this check if we're sure it is
-                    // updated elsewhere correctly.
                     else {
+                        // TODO: could remove this check if we're sure it is
+                        // updated elsewhere correctly.
                         assert_eq!(Some(removed.distance), self.extra_ties_dist);
                     }
                     let count = self.extra_ties.entry(removed.label).or_insert(0);

@@ -19,6 +19,7 @@ serde_json = "1.0"
 csv = "1.0.0"
 ndarray-parallel = "0.8"
 ordered-float = "0.5.0"
+float-cmp = "0.5.2"
 strsim = "0.9.1"
 
 [dev-dependencies]

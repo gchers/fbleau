@@ -98,7 +98,7 @@ use fbleau::estimates::*;
 use security_measures::*;
 use utils::{load_data, vectors_to_ids, scale01, estimate_random_guessing};
 
-const USAGE: &'static str = "
+const USAGE: &str = "
 Estimate k-NN error and convergence.
 
 Usage: fbleau log [options] <train> <test>
@@ -172,7 +172,7 @@ fn nn_bound(error: f64, nlabels: usize) -> f64 {
 
 /// Returns a (boxed) closure determining how to compute k
 /// given the number of training examples n.
-fn k_from_n(args: &Args) -> Box<Fn(usize) -> usize> {
+fn k_from_n(args: &Args) -> Box<dyn Fn(usize) -> usize> {
     if let Some(k) = args.flag_knn {
         Box::new(move |_| k)
     } else if args.cmd_nn_bound {
