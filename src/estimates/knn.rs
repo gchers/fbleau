@@ -411,6 +411,8 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
     // max_k nearest neighbors for each test object.
     neighbors: Vec<NearestNeighbors<D>>,
     // Error for each test object.
+    // TODO: we could have bit vectors (e.g., Vec<bool> or BitVec)
+    // for errors. This should (very slightly) improve memory performance.
     pub errors: Vec<f64>,
     // Current prediction for each test label.
     pub predictions: Vec<Label>,
