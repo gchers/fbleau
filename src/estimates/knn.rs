@@ -406,8 +406,9 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
 /// Keeps track of the error of a k-NN classifier, with the possibility
 /// of changing k and removing training examples.
 #[derive(Debug)]
-pub struct KNNEstimator<D>
-where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
+pub struct KNNEstimator<D,K>
+where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64,
+      K: Fn(usize) -> usize {
     // max_k nearest neighbors for each test object.
     neighbors: Vec<NearestNeighbors<D>>,
     // Error for each test object.
@@ -426,13 +427,17 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
     // remove_one() is n-1. The next training example to be added by
     // add_example() is n-1.
     n: usize,
+    // Function k(n) used to determine the value of k given n.
+    k_from_n: K,
 }
 
-impl<D> KNNEstimator<D>
-where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
+impl<D,K> KNNEstimator<D,K>
+where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy,
+      K: Fn(usize) -> usize {
     /// Create a new k-NN estimator.
     pub fn new(test_x: &ArrayView2<f64>, test_y: &ArrayView1<Label>,
-           k: usize, max_k: usize, distance: D) -> KNNEstimator<D> {
+               k: usize, max_k: usize, distance: D, k_from_n: K)
+            -> KNNEstimator<D,K> {
         assert_eq!(test_x.rows(), test_y.len());
         assert!(test_y.len() > 0);
 
@@ -458,13 +463,15 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
             current_k: k,
             k_error_count: error_count,
             n: 0,
+            k_from_n: k_from_n,
         }
     }
 
     /// Create a k-NN estimator from training and test set.
     pub fn from_data(train_x: &ArrayView2<f64>, train_y: &ArrayView1<Label>,
-           test_x: &ArrayView2<f64>, test_y: &ArrayView1<Label>,
-           k: usize, max_k: usize, distance: D) -> KNNEstimator<D> {
+            test_x: &ArrayView2<f64>, test_y: &ArrayView1<Label>,
+            k: usize, max_k: usize, distance: D, k_from_n: K)
+            -> KNNEstimator<D,K> {
         assert_eq!(train_x.cols(), test_x.cols());
         assert_eq!(train_x.rows(), train_y.len());
         assert_eq!(test_x.rows(), test_y.len());
@@ -502,6 +509,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
             current_k: k,
             k_error_count: knn_error,
             n: train_y.len(),
+            k_from_n: k_from_n,
         }
     }
 
@@ -526,9 +534,12 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     }
 
     pub fn add_example(&mut self, x: &ArrayView1<f64>, y: Label) -> Result<(), ()> {
+        // Update k with respect to n.
+        self.set_k((self.k_from_n)(self.n));
+        // We update n here, before error are (possibly) raised.
+        self.n += 1;
         // We copy because we're using them in the closure below.
         let current_k = self.current_k;
-        self.n += 1;    // NOTE: need to update here, before possible errors.
 
         // We do all this in this gigantic closure so that we can
         // parallelize it with rayon.
