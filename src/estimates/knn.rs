@@ -413,7 +413,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
     // Error for each test object.
     // TODO: we could have bit vectors (e.g., Vec<bool> or BitVec)
     // for errors. This should (very slightly) improve memory performance.
-    pub errors: Vec<f64>,
+    pub errors: Vec<u32>,
     // Current prediction for each test label.
     pub predictions: Vec<Label>,
     // True test labels.
@@ -421,7 +421,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
     // Last queried k.
     current_k: usize,
     // k-NN count, for k = current_k.
-    pub k_error_count: f64,
+    pub k_error_count: u32,
     // Size of training data. The next training example to be removed by
     // remove_one() is n-1. The next training example to be added by
     // add_example() is n-1.
@@ -447,7 +447,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         // predictions (and errors, k_error_count, ...) to an Option value.
         // TODO: should we?
         let errors = test_y.iter()
-                           .map(|y| if *y != 0 { 1. } else { 0. })
+                           .map(|y| if *y != 0 { 1 } else { 0 })
                            .collect::<Vec<_>>();
         let error_count = errors.iter().sum();
         KNNEstimator {
@@ -480,14 +480,14 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
                                                            distance))
                             .collect::<Vec<_>>();
 
-        let mut knn_error = 0.;
+        let mut knn_error = 0;
         let mut errors = Vec::with_capacity(test_y.len());
         let mut predictions = Vec::with_capacity(test_y.len());
 
         for (neigh, y) in neighbors.iter().zip(test_y) {
             let pred = neigh.predict(k)
                             .expect("unexpected error");
-            let error = if pred != *y { 1. } else { 0. };
+            let error = if pred != *y { 1 } else { 0 };
 
             predictions.push(pred);
             errors.push(error);
@@ -516,7 +516,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
             if pred == *p {
                 continue;
             }
-            let error = if pred != *y { 1. } else { 0. };
+            let error = if pred != *y { 1 } else { 0 };
 
             self.k_error_count += error - *e;
             *p = pred;
@@ -559,7 +559,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
                     }
 
                     // Update error.
-                    let error = if pred != *true_y { 1. } else { 0. };
+                    let error = if pred != *true_y { 1 } else { 0 };
 
                     let update = error - *old_error;
                     *old_error = error;
@@ -570,14 +570,14 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
             })
             .collect();
 
-        self.k_error_count += error_updates?.iter().sum::<f64>();
+        self.k_error_count += error_updates?.iter().sum::<u32>();
 
         Ok(())
     }
 
     /// Returns the error for the current k.
     pub fn get_error(&self) -> f64 {
-        self.k_error_count / self.labels.len() as f64
+        self.k_error_count as f64 / self.labels.len() as f64
     }
     
     /// Returns the error count for the current k.
