@@ -536,17 +536,24 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     /// Called when when k changes.
     fn update_all(&mut self) -> Result<(), ()> {
 
-        for (neigh, y, p, e) in izip!(&self.neighbors, &self.labels,
-                                      &mut self.predictions, &mut self.errors) {
+        for (neigh, y, old_pred, old_error) in
+                izip!(&self.neighbors, &self.labels,
+                      &mut self.predictions, &mut self.errors) {
             let pred = neigh.predict(self.current_k)?;
-            if pred == *p {
+            if pred == *old_pred {
                 continue;
             }
             let error = if pred != *y { 1 } else { 0 };
 
-            self.k_error_count += error - *e;
-            *p = pred;
-            *e = error;
+            match (error, *old_error) {
+                (1, 0) => { self.k_error_count += 1 },
+                (0, 1) => { self.k_error_count -= 1 },
+                // No need to update.
+                _ => {},
+            };
+
+            *old_pred = pred;
+            *old_error = error;
         }
         Ok(())
     }
@@ -605,16 +612,28 @@ impl<D> BayesEstimator for KNNEstimator<D>
                     // Update error.
                     let error = if pred != *true_y { 1 } else { 0 };
 
-                    let update = error - *old_error;
-                    *old_error = error;
                     *old_pred = pred;
+
+                    let update = match (error, *old_error) {
+                        (1, 0) => 1,
+                        (0, 1) => -1,
+                        // No need to update. Note that we do not need
+                        // to set *old_error = error either, as they're
+                        // also the same. So we can return now.
+                        _ => { return None },
+                    };
+
+                    *old_error = error;
                     return Some(Ok(update));
                 }
                 None
             })
             .collect();
 
-        self.k_error_count += error_updates?.iter().sum::<u32>();
+        // We sum the updates as i32, as they may be +1/-1.
+        let update = error_updates?.iter().sum::<i32>();
+        assert!(update >= 0);
+        self.k_error_count += update as u32;
 
         Ok(())
     }
