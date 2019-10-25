@@ -66,6 +66,7 @@ use std::cmp::Ordering;
 use float_cmp::approx_eq;
 
 use Label;
+use estimates::BayesEstimator;
 
 /// Nearest neighbors to a test object.
 #[derive(Debug)]
@@ -533,7 +534,23 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy,
         Ok(())
     }
 
-    pub fn add_example(&mut self, x: &ArrayView1<f64>, y: Label) -> Result<(), ()> {
+    /// Changes the k for which k-NN predictions are given.
+    pub fn set_k(&mut self, k: usize) -> Result<(), ()> {
+        if k != self.current_k {
+            self.current_k = k;
+            self.update_all()?;
+        }
+        Ok(())
+    }
+}
+
+impl<D,K> BayesEstimator for KNNEstimator<D,K>
+    where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy,
+          K: Fn(usize) -> usize {
+    /// Adds a new example to the k-NN estimator's training data.
+    ///
+    /// This also updates the prediction, if necessary.
+    fn add_example(&mut self, x: &ArrayView1<f64>, y: Label) -> Result<(), ()> {
         // Update k with respect to n.
         self.set_k((self.k_from_n)(self.n));
         // We update n here, before error are (possibly) raised.
@@ -586,23 +603,14 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy,
         Ok(())
     }
 
-    /// Returns the error for the current k.
-    pub fn get_error(&self) -> f64 {
-        self.k_error_count as f64 / self.labels.len() as f64
-    }
-    
     /// Returns the error count for the current k.
-    pub fn get_error_count(&self) -> usize {
+    fn get_error_count(&self) -> usize {
         self.k_error_count as usize
     }
 
-    /// Changes the k for which k-NN predictions are given.
-    pub fn set_k(&mut self, k: usize) -> Result<(), ()> {
-        if k != self.current_k {
-            self.current_k = k;
-            self.update_all()?;
-        }
-        Ok(())
+    /// Returns the error for the current k.
+    fn get_error(&self) -> f64 {
+        self.k_error_count as f64 / self.labels.len() as f64
     }
 }
 
