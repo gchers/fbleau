@@ -1,12 +1,14 @@
 //! This module implements Bayes risk estimates, and heuristics for
 //! evaluating convergence.
 pub mod knn;
+pub mod knn_utils;
 pub mod frequentist;
 pub mod convergence;
 
 pub use self::knn::KNNEstimator;
 pub use self::frequentist::FrequentistEstimator;
 pub use self::convergence::ForwardChecker;
+pub use self::knn_utils::{KNNStrategy,knn_strategy,nn_bound};
 
 use Label;
 use ndarray::prelude::*;
