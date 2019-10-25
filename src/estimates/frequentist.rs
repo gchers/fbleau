@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use ordered_float::OrderedFloat;
 
 use Label;
-use estimates::{some_or_error};
+use estimates::{BayesEstimator,some_or_error};
 
 // Type of the elements of a feature vector.
 type ObjectValue = usize;
@@ -227,65 +227,6 @@ impl FrequentistEstimator {
         }
     }
 
-    /// Adds a new training example.
-    pub fn add_example(&mut self, x: ArrayView1<f64>, y: Label) {
-        let x = self.array_to_index.map(x);
-        self.train_x.push(x);
-        self.train_y.push(y);
-
-        let mut old_priors_pred = match self.priors_count.predict() {
-            Some(pred) => pred,
-            None => { return self.add_first_example(x, y) },
-        };
-
-        // If max prior changed, update predictions for those that were
-        // predicted with priors.
-        let priors_changed = self.priors_count.add_example(y);
-        if priors_changed {
-            let new_pred = self.priors_count.predict().unwrap();
-
-            for (xi, &yi) in self.test_x.iter().zip(&self.test_y) {
-                // Match points for which we random guess.
-                let joint = self.joint_count.get(xi).expect("shouldn't happen");
-                if joint.predict().is_none() {
-                    let old_error = if yi != old_priors_pred { 1 } else { 0 };
-                    let new_error = if yi != new_pred { 1 } else { 0 };
-
-                    self.error_count = self.error_count + new_error - old_error;
-                }
-            }
-            // NOTE: we also need to update the value of old_priors_pred,
-            // because otherwise we'll have issues when updating w.r.t.
-            // the joint distribution later in this function.
-            old_priors_pred = new_pred;
-        }
-
-        // Update joint counts (and error), but only if `x` appears
-        // in the test set.
-        if let Some(joint) = self.joint_count.get_mut(&x) {
-            let old_pred = match joint.predict() {
-                Some(pred) => pred,
-                None => old_priors_pred,
-            };
-            // Only update prediction if max P(o,s) changed.
-            let joint_changed = joint.add_example(y);
-            if joint_changed {
-                // Predict again.
-                let new_pred = joint.predict().unwrap();
-
-                for (&xi, &yi) in self.test_x.iter().zip(&self.test_y) {
-                    // Only update predictions for observations with value `x`.
-                    if xi == x {
-                        let old_error = if yi != old_pred { 1 } else { 0 };
-                        let new_error = if yi != new_pred { 1 } else { 0 };
-
-                        self.error_count = self.error_count + new_error - old_error;
-                    }
-                }
-            }
-        }
-    }
-
     pub fn remove_one(&mut self) -> Result<(), ()> {
         // TODO: better error handling.
         let x = some_or_error(self.train_x.pop())?;
@@ -340,13 +281,77 @@ impl FrequentistEstimator {
         }
         Ok(())
     }
+}
 
-    pub fn get_error(&self) -> f64 {
-        (self.error_count as f64) / (self.test_y.len() as f64)
+impl BayesEstimator for FrequentistEstimator {
+    /// Adds a new training example.
+    fn add_example(&mut self, x: &ArrayView1<f64>, y: Label) -> Result<(), ()> {
+        let x = self.array_to_index.map(*x);
+        self.train_x.push(x);
+        self.train_y.push(y);
+
+        let mut old_priors_pred = match self.priors_count.predict() {
+            Some(pred) => pred,
+            None => { return Ok(self.add_first_example(x, y)) },
+        };
+
+        // If max prior changed, update predictions for those that were
+        // predicted with priors.
+        let priors_changed = self.priors_count.add_example(y);
+        if priors_changed {
+            let new_pred = self.priors_count.predict().unwrap();
+
+            for (xi, &yi) in self.test_x.iter().zip(&self.test_y) {
+                // Match points for which we random guess.
+                let joint = self.joint_count.get(xi).expect("shouldn't happen");
+                if joint.predict().is_none() {
+                    let old_error = if yi != old_priors_pred { 1 } else { 0 };
+                    let new_error = if yi != new_pred { 1 } else { 0 };
+
+                    self.error_count = self.error_count + new_error - old_error;
+                }
+            }
+            // NOTE: we also need to update the value of old_priors_pred,
+            // because otherwise we'll have issues when updating w.r.t.
+            // the joint distribution later in this function.
+            old_priors_pred = new_pred;
+        }
+
+        // Update joint counts (and error), but only if `x` appears
+        // in the test set.
+        if let Some(joint) = self.joint_count.get_mut(&x) {
+            let old_pred = match joint.predict() {
+                Some(pred) => pred,
+                None => old_priors_pred,
+            };
+            // Only update prediction if max P(o,s) changed.
+            let joint_changed = joint.add_example(y);
+            if joint_changed {
+                // Predict again.
+                let new_pred = joint.predict().unwrap();
+
+                for (&xi, &yi) in self.test_x.iter().zip(&self.test_y) {
+                    // Only update predictions for observations with value `x`.
+                    if xi == x {
+                        let old_error = if yi != old_pred { 1 } else { 0 };
+                        let new_error = if yi != new_pred { 1 } else { 0 };
+
+                        self.error_count = self.error_count + new_error - old_error;
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
-    pub fn get_error_count(&self) -> usize {
+    /// Returns the current number of errors.
+    fn get_error_count(&self) -> usize {
         self.error_count
+    }
+
+    /// Returns the current error rate.
+    fn get_error(&self) -> f64 {
+        (self.error_count as f64) / (self.test_y.len() as f64)
     }
 }
 
@@ -542,14 +547,14 @@ mod tests {
 
         // Estimate.
         // 11)
-        freq.add_example(train_x.row(0), train_y[0]);
+        freq.add_example(&train_x.row(0), train_y[0]);
         assert_eq!(freq.joint_count.get(&0).unwrap().count, vec![1, 0, 0]);
         assert_eq!(freq.joint_count.get(&0).unwrap().predict().unwrap(), 0);
         assert_eq!(freq.priors_count.count, vec![1, 0, 0]);
         assert_eq!(freq.error_count, 6);
 
         // 10)
-        freq.add_example(train_x.row(1), train_y[1]);
+        freq.add_example(&train_x.row(1), train_y[1]);
         assert_eq!(freq.joint_count.get(&0).unwrap().count, vec![1, 1, 0]);
         assert_eq!(freq.priors_count.count, vec![1, 1, 0]);
         //assert_eq!(freq.error_count, 2);
@@ -560,7 +565,7 @@ mod tests {
         assert_eq!(freq.error_count, 6);
 
         // 9)
-        freq.add_example(train_x.row(2), train_y[2]);
+        freq.add_example(&train_x.row(2), train_y[2]);
         assert_eq!(freq.joint_count.get(&1).unwrap().count, vec![0, 0, 0]);
         assert!(freq.joint_count.get(&1).unwrap().predict().is_none());
         assert_eq!(freq.priors_count.count, vec![1, 2, 0]);
@@ -568,14 +573,14 @@ mod tests {
 
 
         // 8)
-        freq.add_example(train_x.row(3), train_y[3]);
+        freq.add_example(&train_x.row(3), train_y[3]);
         assert_eq!(freq.joint_count.get(&1).unwrap().count, vec![0, 0, 1]);
         assert_eq!(freq.joint_count.get(&1).unwrap().predict().unwrap(), 2);
         assert_eq!(freq.priors_count.count, vec![1, 2, 1]);
         assert_eq!(freq.error_count, 3);
 
         // 7)
-        freq.add_example(train_x.row(4), train_y[4]);
+        freq.add_example(&train_x.row(4), train_y[4]);
         assert_eq!(freq.joint_count.get(&2).unwrap().count, vec![0, 0, 0]);
         // Starts predicting with priors also for 2.
         assert!(freq.joint_count.get(&2).unwrap().predict().is_none());
@@ -583,14 +588,14 @@ mod tests {
         assert_eq!(freq.error_count, 3);
 
         // 6)
-        freq.add_example(train_x.row(5), train_y[5]);
+        freq.add_example(&train_x.row(5), train_y[5]);
         assert_eq!(freq.joint_count.get(&2).unwrap().count, vec![0, 1, 0]);
         assert_eq!(freq.joint_count.get(&2).unwrap().predict().unwrap(), 1);
         assert_eq!(freq.priors_count.count, vec![1, 3, 2]);
         assert_eq!(freq.error_count, 3);
 
         // 5)
-        freq.add_example(train_x.row(6), train_y[6]);
+        freq.add_example(&train_x.row(6), train_y[6]);
         assert_eq!(freq.joint_count.get(&2).unwrap().count, vec![0, 1, 1]);
         //assert_eq!(freq.joint_count.get(&2).unwrap().predict().unwrap(), 2);
         let pred = freq.joint_count.get(&2).unwrap().predict().unwrap();
@@ -605,14 +610,14 @@ mod tests {
         assert!(freq.error_count == 3);
 
         // 4)
-        freq.add_example(train_x.row(7), train_y[7]);
+        freq.add_example(&train_x.row(7), train_y[7]);
         assert_eq!(freq.joint_count.get(&2).unwrap().count, vec![0, 1, 2]);
         assert_eq!(freq.joint_count.get(&2).unwrap().predict().unwrap(), 2);
         assert_eq!(freq.priors_count.count, vec![1, 3, 4]);
         assert_eq!(freq.error_count, 4);
 
         // 3)
-        freq.add_example(train_x.row(8), train_y[8]);
+        freq.add_example(&train_x.row(8), train_y[8]);
         assert_eq!(freq.joint_count.get(&2).unwrap().count, vec![1, 1, 2]);
         assert_eq!(freq.joint_count.get(&2).unwrap().predict().unwrap(), 2);
         assert_eq!(freq.priors_count.count, vec![2, 3, 4]);
@@ -620,7 +625,7 @@ mod tests {
         assert_eq!(freq.error_count, 4);    // Increases because of priors.
 
         // 2)
-        freq.add_example(train_x.row(9), train_y[9]);
+        freq.add_example(&train_x.row(9), train_y[9]);
         assert_eq!(freq.joint_count.get(&2).unwrap().count, vec![1, 2, 2]);
         let pred = freq.joint_count.get(&2).unwrap().predict().unwrap();
         // More properly it should be: assert!(pred == 1 || pred == 2);
@@ -630,12 +635,12 @@ mod tests {
         assert_eq!(freq.error_count, 4);
 
         // 1)
-        freq.add_example(train_x.row(10), train_y[10]);
+        freq.add_example(&train_x.row(10), train_y[10]);
         assert_eq!(freq.priors_count.count, vec![2, 5, 4]);
         assert_eq!(freq.error_count, 3);
 
         // 0)
-        freq.add_example(train_x.row(11), train_y[11]);
+        freq.add_example(&train_x.row(11), train_y[11]);
         assert_eq!(freq.error_count, 3);
         assert_eq!(freq.priors_count.count, vec![2, 6, 4]);
     }

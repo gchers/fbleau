@@ -35,12 +35,12 @@
 //!                     [4.],
 //!                     [5.]];
 //! let test_y = array![0, 0, 2, 1, 0, 1, 0];
-//! let max_k = 8;
+//! let max_n = train_x.rows();
 //! 
 //! let k = 3;
 //! let mut knn = KNNEstimator::from_data(&train_x.view(), &train_y.view(),
-//!                             &test_x.view(), &test_y.view(), k, max_k,
-//!                             euclidean_distance);
+//!                             &test_x.view(), &test_y.view(), max_n,
+//!                             euclidean_distance, KNNStrategy::FixedK(k));
 //!
 //! assert_eq!(knn.get_error(), 0.42857142857142855);
 //!
@@ -66,6 +66,7 @@ use std::cmp::Ordering;
 use float_cmp::approx_eq;
 
 use Label;
+use estimates::{BayesEstimator,KNNStrategy,knn_strategy};
 
 /// Nearest neighbors to a test object.
 #[derive(Debug)]
@@ -403,15 +404,18 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
     }
 }
 
+
 /// Keeps track of the error of a k-NN classifier, with the possibility
 /// of changing k and removing training examples.
-#[derive(Debug)]
 pub struct KNNEstimator<D>
 where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
+      //K: Fn(usize) -> usize {
     // max_k nearest neighbors for each test object.
     neighbors: Vec<NearestNeighbors<D>>,
     // Error for each test object.
-    pub errors: Vec<f64>,
+    // TODO: we could have bit vectors (e.g., Vec<bool> or BitVec)
+    // for errors. This should (very slightly) improve memory performance.
+    pub errors: Vec<u32>,
     // Current prediction for each test label.
     pub predictions: Vec<Label>,
     // True test labels.
@@ -419,20 +423,33 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
     // Last queried k.
     current_k: usize,
     // k-NN count, for k = current_k.
-    pub k_error_count: f64,
+    pub k_error_count: u32,
     // Size of training data. The next training example to be removed by
     // remove_one() is n-1. The next training example to be added by
     // add_example() is n-1.
     n: usize,
+    // Function k(n) used to determine the value of k given n.
+    // TODO: might be replaced with a closure in the future, for
+    // better performances.
+    k_from_n: Box<dyn Fn(usize) -> usize>,
 }
 
 impl<D> KNNEstimator<D>
 where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     /// Create a new k-NN estimator.
     pub fn new(test_x: &ArrayView2<f64>, test_y: &ArrayView1<Label>,
-           k: usize, max_k: usize, distance: D) -> KNNEstimator<D> {
+               max_n: usize, distance: D, strategy: KNNStrategy)
+            -> KNNEstimator<D> {
         assert_eq!(test_x.rows(), test_y.len());
         assert!(test_y.len() > 0);
+
+        // How we select k given n.
+        let k_from_n = knn_strategy(strategy);
+        // max_k specifies the maximum number of neighbors to store
+        // (excluding ties); a smaller max_k improves performances, but
+        // its value should be sufficiently large to give correct
+        // results once we've seen all the training data.
+        let max_k = k_from_n(max_n);
 
         let neighbors = test_x.outer_iter()
                               .into_par_iter()
@@ -445,29 +462,37 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         // predictions (and errors, k_error_count, ...) to an Option value.
         // TODO: should we?
         let errors = test_y.iter()
-                           .map(|y| if *y != 0 { 1. } else { 0. })
+                           .map(|y| if *y != 0 { 1 } else { 0 })
                            .collect::<Vec<_>>();
         let error_count = errors.iter().sum();
+
         KNNEstimator {
             neighbors: neighbors,
             errors: errors,
             predictions: vec![0; test_y.len()],
             labels: test_y.to_vec(),
-            current_k: k,
+            current_k: 1,
             k_error_count: error_count,
             n: 0,
+            k_from_n: k_from_n,
         }
     }
 
     /// Create a k-NN estimator from training and test set.
     pub fn from_data(train_x: &ArrayView2<f64>, train_y: &ArrayView1<Label>,
-           test_x: &ArrayView2<f64>, test_y: &ArrayView1<Label>,
-           k: usize, max_k: usize, distance: D) -> KNNEstimator<D> {
+            test_x: &ArrayView2<f64>, test_y: &ArrayView1<Label>,
+            max_n: usize, distance: D, strategy: KNNStrategy)
+            -> KNNEstimator<D> {
         assert_eq!(train_x.cols(), test_x.cols());
         assert_eq!(train_x.rows(), train_y.len());
         assert_eq!(test_x.rows(), test_y.len());
         assert!(train_x.len() > 0);
         assert!(test_x.len() > 0);
+
+        // How we select k given n.
+        let k_from_n = knn_strategy(strategy);
+        // Maximum number of neighbors to store (excluding ties).
+        let max_k = k_from_n(max_n);
 
         let neighbors = test_x.outer_iter()
                             .into_par_iter()
@@ -478,14 +503,16 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
                                                            distance))
                             .collect::<Vec<_>>();
 
-        let mut knn_error = 0.;
+        let n = train_y.len();
+        let k = k_from_n(n);
+        let mut knn_error = 0;
         let mut errors = Vec::with_capacity(test_y.len());
         let mut predictions = Vec::with_capacity(test_y.len());
 
         for (neigh, y) in neighbors.iter().zip(test_y) {
             let pred = neigh.predict(k)
                             .expect("unexpected error");
-            let error = if pred != *y { 1. } else { 0. };
+            let error = if pred != *y { 1 } else { 0 };
 
             predictions.push(pred);
             errors.push(error);
@@ -499,7 +526,8 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
             labels: test_y.to_vec(),
             current_k: k,
             k_error_count: knn_error,
-            n: train_y.len(),
+            n: n,
+            k_from_n: k_from_n,
         }
     }
 
@@ -508,25 +536,50 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     /// Called when when k changes.
     fn update_all(&mut self) -> Result<(), ()> {
 
-        for (neigh, y, p, e) in izip!(&self.neighbors, &self.labels,
-                                      &mut self.predictions, &mut self.errors) {
+        for (neigh, y, old_pred, old_error) in
+                izip!(&self.neighbors, &self.labels,
+                      &mut self.predictions, &mut self.errors) {
             let pred = neigh.predict(self.current_k)?;
-            if pred == *p {
+            if pred == *old_pred {
                 continue;
             }
-            let error = if pred != *y { 1. } else { 0. };
+            let error = if pred != *y { 1 } else { 0 };
 
-            self.k_error_count += error - *e;
-            *p = pred;
-            *e = error;
+            match (error, *old_error) {
+                (1, 0) => { self.k_error_count += 1 },
+                (0, 1) => { self.k_error_count -= 1 },
+                // No need to update.
+                _ => {},
+            };
+
+            *old_pred = pred;
+            *old_error = error;
         }
         Ok(())
     }
 
-    pub fn add_example(&mut self, x: &ArrayView1<f64>, y: Label) -> Result<(), ()> {
+    /// Changes the k for which k-NN predictions are given.
+    pub fn set_k(&mut self, k: usize) -> Result<(), ()> {
+        if k != self.current_k {
+            self.current_k = k;
+            self.update_all()?;
+        }
+        Ok(())
+    }
+}
+
+impl<D> BayesEstimator for KNNEstimator<D>
+    where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
+    /// Adds a new example to the k-NN estimator's training data.
+    ///
+    /// This also updates the prediction, if necessary.
+    fn add_example(&mut self, x: &ArrayView1<f64>, y: Label) -> Result<(), ()> {
+        // Update k with respect to n.
+        self.set_k((self.k_from_n)(self.n))?;
+        // We update n here, before error are (possibly) raised.
+        self.n += 1;
         // We copy because we're using them in the closure below.
         let current_k = self.current_k;
-        self.n += 1;    // NOTE: need to update here, before possible errors.
 
         // We do all this in this gigantic closure so that we can
         // parallelize it with rayon.
@@ -557,39 +610,42 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
                     }
 
                     // Update error.
-                    let error = if pred != *true_y { 1. } else { 0. };
+                    let error = if pred != *true_y { 1 } else { 0 };
 
-                    let update = error - *old_error;
-                    *old_error = error;
                     *old_pred = pred;
+
+                    let update = match (error, *old_error) {
+                        (1, 0) => 1,
+                        (0, 1) => -1,
+                        // No need to update. Note that we do not need
+                        // to set *old_error = error either, as they're
+                        // also the same. So we can return now.
+                        _ => { return None },
+                    };
+
+                    *old_error = error;
                     return Some(Ok(update));
                 }
                 None
             })
             .collect();
 
-        self.k_error_count += error_updates?.iter().sum::<f64>();
+        // We sum the updates as i32, as they may be +1/-1.
+        let update = error_updates?.iter().sum::<i32>();
+        assert!(update >= 0);
+        self.k_error_count += update as u32;
 
         Ok(())
     }
 
-    /// Returns the error for the current k.
-    pub fn get_error(&self) -> f64 {
-        self.k_error_count / self.labels.len() as f64
-    }
-    
     /// Returns the error count for the current k.
-    pub fn get_error_count(&self) -> usize {
+    fn get_error_count(&self) -> usize {
         self.k_error_count as usize
     }
 
-    /// Changes the k for which k-NN predictions are given.
-    pub fn set_k(&mut self, k: usize) -> Result<(), ()> {
-        if k != self.current_k {
-            self.current_k = k;
-            self.update_all()?;
-        }
-        Ok(())
+    /// Returns the error for the current k.
+    fn get_error(&self) -> f64 {
+        self.k_error_count as f64 / self.labels.len() as f64
     }
 }
 
@@ -759,13 +815,12 @@ mod tests {
                             [4.],
                             [5.]];
         let test_y = array![0, 0, 2, 1, 0, 1, 0];
-        let max_k = 8;
+        let max_n = train_x.rows();
         let distance = euclidean_distance;
 
         // Test for k = 1.
-        let k = 1;
-        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(), k,
-                                        max_k, distance);
+        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(),
+                                        max_n, distance, KNNStrategy::NN);
 
         // FIXME: I'm not sure why in this case, differently from the
         // backward test, I need to include one more error and prediction.
@@ -792,10 +847,16 @@ mod tests {
         }
 
         // Test when changing k.
-        let k = 1;
-        let max_k = train_y.len();
-        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(), k,
-                                        max_k, distance);
+        let max_n = train_x.rows();
+        // Custom k_from_n.
+        let k_from_n = Box::new(|n| match n {
+            0..=3 => 1,
+            4..=6 => 4,
+            _ => 5,
+        });
+        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(),
+                                        max_n, distance,
+                                        KNNStrategy::Custom(k_from_n));
         let expected_error = vec![0.42857142857142855, 0.42857142857142855,
                                   0.42857142857142855, 0.5714285714285714,
                                   0.42857142857142855, 0.42857142857142855,
@@ -866,6 +927,7 @@ mod tests {
         assert_eq!(nn.predict(5).unwrap(), 0);
     }
 
+    /* FIXME: verify this test is still necessary.
     #[test]
     /// KNNEstimator's parameter updated_k should take ties into account.
     fn test_updated_k() {
@@ -873,19 +935,20 @@ mod tests {
         let test_y = array![1];
 
         let k = 1;
-        let max_k = 5;  // Essential that max_k > k for this test, otherwise
+        let max_n = 5;  // Essential that max_k > k for this test, otherwise
                         // it's a different check.
 
-        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(), k,
-                                        max_k, euclidean_distance);
+        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(),
+                                        max_n, euclidean_distance,
+                                        KNNStrategy::FixedK(5));
+        knn.k_from_n = knn_strategy(KNNStrategy::NN);
+
 
         // We'll only observe examples with distance 2 from x.
-        println!("asdf");
 
         // First all with label 0.
         for _ in 0..5 {
             knn.add_example(&array![2.].view(), 0).unwrap();
-            println!("asdf");
         }
 
         assert_eq!(knn.predictions, vec![0]);
@@ -893,9 +956,9 @@ mod tests {
         // Now we change the ties' label distribution to 1.
         for _ in 0..6 {
             knn.add_example(&array![2.].view(), 1).unwrap();
-            println!("asdf");
         }
 
         assert_eq!(knn.predictions, vec![1]);
     }
+    */
 }

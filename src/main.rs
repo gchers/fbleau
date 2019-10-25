@@ -116,9 +116,6 @@ Options:
                                 training data.
     --absolute                  Use absolute convergence instead of relative
                                 convergence.
-    --max-k=<k>                 Number of neighbors to store, initially,
-                                for each test point. May improve performances,
-                                but only use if you know what you are doing.
     --scale                     Scale features before running k-NN
                                 (only makes sense for objects of 2 or more
                                 dimensions).
@@ -140,7 +137,6 @@ struct Args {
     flag_verbose: Option<String>,
     flag_delta: Option<f64>,
     flag_qstop: Option<usize>,
-    flag_max_k: Option<usize>,
     flag_absolute: bool,
     flag_scale: bool,
     flag_nprocs: Option<usize>,
@@ -149,52 +145,6 @@ struct Args {
     arg_test: String,
 }
 
-/// Returns `n` if `n` is odd, otherwise `n+1`.
-fn next_odd(n: usize) -> usize {
-    match n % 2 {
-        0 => n + 1,
-        _ => n,
-    }
-}
-
-/// Computes the NN bound derived from Cover&Hart, given
-/// the error and the number of labels.
-fn nn_bound(error: f64, nlabels: usize) -> f64 {
-    let nl = nlabels as f64;
-    // Computing: (L-1)/L * (1 - (1 - L/(L-1)*error).sqrt())
-    // with error = min(error, rg).
-    let rg = (nl-1.)/nl;
-    match error {
-        e if e < rg => rg * (1. - (1. - nl/(nl-1.)*error).sqrt()),
-        _ => rg,
-    }
-}
-
-/// Returns a (boxed) closure determining how to compute k
-/// given the number of training examples n.
-fn k_from_n(args: &Args) -> Box<dyn Fn(usize) -> usize> {
-    if let Some(k) = args.flag_knn {
-        Box::new(move |_| k)
-    } else if args.cmd_nn_bound {
-        Box::new(|_| 1)
-    } else if args.cmd_log {
-        Box::new(|n| next_odd(if n != 0 {
-                                (n as f64).ln().ceil() as usize
-                              } else {
-                                1
-                              }))
-    } else if args.cmd_log10 {
-        Box::new(|n| next_odd(if n != 0 {
-                                (n as f64).log10().ceil() as usize
-                              } else {
-                                1
-                              }))
-    } else if args.cmd_frequentist {
-        Box::new(move |_| 0)
-    } else {
-        panic!("this shouldn't happen");
-    }
-}
 
 /// Prints several security measures that can be derived from a Bayes risk
 /// estimate and Random guessing error.
@@ -211,16 +161,18 @@ fn print_all_measures(bayes_risk_estimate: f64, random_guessing: f64) {
 
 /// Estimates security measures with a forward strategy (i.e., with an
 /// increasing number of examples).
-fn run_forward_strategy<F>(mut estimator: Estimator<F>, compute_nn_bound: bool,
-                        nlabels: usize, mut convergence_checker: Option<ForwardChecker>,
+fn run_forward_strategy<E>(mut estimator: E, compute_nn_bound: bool,
+                        nlabels: usize,
+                        mut convergence_checker: Option<ForwardChecker>,
                         verbose: Option<String>, train_x: Array2<f64>,
                         train_y: Array1<Label>) -> (f64, f64)
-                        where F: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
+                        where E: BayesEstimator {
     // Init verbose log file.
     let mut logfile = if let Some(fname) = verbose {
         let mut logfile = File::create(&fname)
                                .expect("couldn't open file for verbose logging");
-        writeln!(logfile, "n, error-count, estimate").expect("failed to write to verbose file");
+        writeln!(logfile, "n, error-count, estimate")
+            .expect("failed to write to verbose file");
         Some(logfile)
     } else {
         None
@@ -232,14 +184,9 @@ fn run_forward_strategy<F>(mut estimator: Estimator<F>, compute_nn_bound: bool,
 
     for (n, (x, y)) in train_x.outer_iter().zip(train_y.iter()).enumerate() {
         // Compute error.
-        last_error = match estimator.next(n, &x, *y) {
-            Ok(error) => error,
-            Err(_) => {
-                // TODO: this error is specific to k-NN. If we add new
-                // methods we may want to change this.
-                panic!("Could not add more examples: maybe increase --max-k?");
-            },
-        };
+        estimator.add_example(&x, *y)
+                 .expect("Could not add more examples.");
+        last_error = estimator.get_error();
 
         // Compute NN bound by Cover and Hart if needed.
         if compute_nn_bound {
@@ -251,8 +198,8 @@ fn run_forward_strategy<F>(mut estimator: Estimator<F>, compute_nn_bound: bool,
         }
 
         if let Some(ref mut logfile) = logfile {
-            writeln!(logfile, "{}, {}, {}", n, estimator.error_count(),
-                   last_error).expect("failed to write to verbose file");
+            writeln!(logfile, "{}, {}, {}", n, estimator.get_error_count(),
+                     last_error).expect("failed to write to verbose file");
         }
 
         // Should we stop because of (delta, q)-convergence?
@@ -309,7 +256,8 @@ fn main() {
     // it as it is, which is the "safest" option.
     assert_eq!(nlabels, train_nlabels,
                "Test data contains labels unseen in training data.
-                Each test label should appear in the training data; the converse is not necessary");
+                Each test label should appear in the training data;
+                the converse is not necessary");
 
     // (delta, q)-convergence checker
     let convergence_checker = if args.flag_delta.is_none() && args.flag_qstop.is_none() {
@@ -333,42 +281,48 @@ fn main() {
         scale01(&mut test_x);
     }
 
-    let distance = match args.flag_distance.as_ref().map(String::as_ref) {
-        Some("euclidean") => fbleau::estimates::euclidean_distance,
-        Some("levenshtein") => fbleau::estimates::levenshtein_distance,
-        Some(_) => fbleau::estimates::euclidean_distance,
-        None => fbleau::estimates::euclidean_distance
-    };
-
-    // Init estimator.
-    let estimator = if args.cmd_frequentist {
-        Estimator::Frequentist(FrequentistEstimator::new(nlabels,
-                                 &test_x.view(),
-                                 &test_y.view()))
-    } else {
-        // How k is computed w.r.t. n.
-        let kn = k_from_n(&args);
-        // max_k specifies the maximum number of neighbors to store
-        // (excluding ties); a smaller max_k improves performances, but
-        // its value should be sufficiently large to give correct
-        // results once we've seen all the training data.
-        let max_k = match args.flag_max_k {
-            Some(max_k) => max_k,
-            None => kn(train_x.rows()),
-        };
-
-        Estimator::KNN(KNNEstimator::new(&test_x.view(), &test_y.view(),
-                                         1, max_k, distance), kn)
-    };
-
     let random_guessing = estimate_random_guessing(&test_y.view());
     println!("Random guessing error: {}", random_guessing);
     println!("Estimating leakage measures...");
 
-    let (min_error, last_error) = run_forward_strategy(estimator, args.cmd_nn_bound,
-                                                       nlabels, convergence_checker,
-                                                       args.flag_verbose, train_x,
-                                                       train_y);
+    // Init estimator and run.
+    let (min_error, last_error) = if args.cmd_frequentist {
+        let estimator = FrequentistEstimator::new(nlabels,
+                                                  &test_x.view(),
+                                                  &test_y.view());
+        run_forward_strategy(estimator, args.cmd_nn_bound, nlabels,
+                             convergence_checker, args.flag_verbose, train_x,
+                             train_y)
+    } else {
+        // Distance for k-NN.
+        let distance = match args.flag_distance.as_ref().map(String::as_ref) {
+            Some("euclidean") => fbleau::estimates::euclidean_distance,
+            Some("levenshtein") => fbleau::estimates::levenshtein_distance,
+            _ => fbleau::estimates::euclidean_distance
+        };
+        // How k is computed w.r.t. n.
+        let k_from_n = if args.cmd_nn_bound {
+            KNNStrategy::NN
+        } else if let Some(k) = args.flag_knn {
+            KNNStrategy::FixedK(k)
+        } else if args.cmd_log {
+            KNNStrategy::Ln
+        } else if args.cmd_log10 {
+            KNNStrategy::Log10
+        } else {
+            panic!("Issue in parsing command.");
+        };
+
+        // Maximum value that n will take.
+        let max_n = train_x.rows();
+
+        let estimator = KNNEstimator::new(&test_x.view(), &test_y.view(),
+                                          max_n, distance, k_from_n);
+        run_forward_strategy(estimator, args.cmd_nn_bound, nlabels,
+                             convergence_checker, args.flag_verbose, train_x,
+                             train_y)
+    };
+
 
     println!();
     println!("Final estimate: {}", last_error);
