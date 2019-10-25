@@ -66,7 +66,7 @@ use std::cmp::Ordering;
 use float_cmp::approx_eq;
 
 use Label;
-use estimates::BayesEstimator;
+use estimates::{BayesEstimator,KNNStrategy,knn_strategy};
 
 /// Nearest neighbors to a test object.
 #[derive(Debug)]
@@ -404,12 +404,12 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
     }
 }
 
+
 /// Keeps track of the error of a k-NN classifier, with the possibility
 /// of changing k and removing training examples.
-#[derive(Debug)]
-pub struct KNNEstimator<D,K>
-where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64,
-      K: Fn(usize) -> usize {
+pub struct KNNEstimator<D>
+where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
+      //K: Fn(usize) -> usize {
     // max_k nearest neighbors for each test object.
     neighbors: Vec<NearestNeighbors<D>>,
     // Error for each test object.
@@ -429,18 +429,27 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64,
     // add_example() is n-1.
     n: usize,
     // Function k(n) used to determine the value of k given n.
-    k_from_n: K,
+    // TODO: might be replaced with a closure in the future, for
+    // better performances.
+    k_from_n: Box<dyn Fn(usize) -> usize>,
 }
 
-impl<D,K> KNNEstimator<D,K>
-where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy,
-      K: Fn(usize) -> usize {
+impl<D> KNNEstimator<D>
+where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     /// Create a new k-NN estimator.
     pub fn new(test_x: &ArrayView2<f64>, test_y: &ArrayView1<Label>,
-               k: usize, max_k: usize, distance: D, k_from_n: K)
-            -> KNNEstimator<D,K> {
+               max_n: usize, distance: D, strategy: KNNStrategy)
+            -> KNNEstimator<D> {
         assert_eq!(test_x.rows(), test_y.len());
         assert!(test_y.len() > 0);
+
+        // How we select k given n.
+        let k_from_n = knn_strategy(strategy);
+        // max_k specifies the maximum number of neighbors to store
+        // (excluding ties); a smaller max_k improves performances, but
+        // its value should be sufficiently large to give correct
+        // results once we've seen all the training data.
+        let max_k = k_from_n(max_n);
 
         let neighbors = test_x.outer_iter()
                               .into_par_iter()
@@ -456,12 +465,13 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy,
                            .map(|y| if *y != 0 { 1 } else { 0 })
                            .collect::<Vec<_>>();
         let error_count = errors.iter().sum();
+
         KNNEstimator {
             neighbors: neighbors,
             errors: errors,
             predictions: vec![0; test_y.len()],
             labels: test_y.to_vec(),
-            current_k: k,
+            current_k: 1,
             k_error_count: error_count,
             n: 0,
             k_from_n: k_from_n,
@@ -471,13 +481,18 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy,
     /// Create a k-NN estimator from training and test set.
     pub fn from_data(train_x: &ArrayView2<f64>, train_y: &ArrayView1<Label>,
             test_x: &ArrayView2<f64>, test_y: &ArrayView1<Label>,
-            k: usize, max_k: usize, distance: D, k_from_n: K)
-            -> KNNEstimator<D,K> {
+            max_n: usize, distance: D, strategy: KNNStrategy)
+            -> KNNEstimator<D> {
         assert_eq!(train_x.cols(), test_x.cols());
         assert_eq!(train_x.rows(), train_y.len());
         assert_eq!(test_x.rows(), test_y.len());
         assert!(train_x.len() > 0);
         assert!(test_x.len() > 0);
+
+        // How we select k given n.
+        let k_from_n = knn_strategy(strategy);
+        // Maximum number of neighbors to store (excluding ties).
+        let max_k = k_from_n(max_n);
 
         let neighbors = test_x.outer_iter()
                             .into_par_iter()
@@ -488,6 +503,8 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy,
                                                            distance))
                             .collect::<Vec<_>>();
 
+        let n = train_y.len();
+        let k = k_from_n(n);
         let mut knn_error = 0;
         let mut errors = Vec::with_capacity(test_y.len());
         let mut predictions = Vec::with_capacity(test_y.len());
@@ -509,7 +526,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy,
             labels: test_y.to_vec(),
             current_k: k,
             k_error_count: knn_error,
-            n: train_y.len(),
+            n: n,
             k_from_n: k_from_n,
         }
     }
@@ -544,15 +561,14 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy,
     }
 }
 
-impl<D,K> BayesEstimator for KNNEstimator<D,K>
-    where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy,
-          K: Fn(usize) -> usize {
+impl<D> BayesEstimator for KNNEstimator<D>
+    where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     /// Adds a new example to the k-NN estimator's training data.
     ///
     /// This also updates the prediction, if necessary.
     fn add_example(&mut self, x: &ArrayView1<f64>, y: Label) -> Result<(), ()> {
         // Update k with respect to n.
-        self.set_k((self.k_from_n)(self.n));
+        self.set_k((self.k_from_n)(self.n))?;
         // We update n here, before error are (possibly) raised.
         self.n += 1;
         // We copy because we're using them in the closure below.
