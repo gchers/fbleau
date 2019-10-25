@@ -35,12 +35,12 @@
 //!                     [4.],
 //!                     [5.]];
 //! let test_y = array![0, 0, 2, 1, 0, 1, 0];
-//! let max_k = 8;
+//! let max_n = train_x.rows();
 //! 
 //! let k = 3;
 //! let mut knn = KNNEstimator::from_data(&train_x.view(), &train_y.view(),
-//!                             &test_x.view(), &test_y.view(), k, max_k,
-//!                             euclidean_distance);
+//!                             &test_x.view(), &test_y.view(), max_n,
+//!                             euclidean_distance, KNNStrategy::FixedK(k));
 //!
 //! assert_eq!(knn.get_error(), 0.42857142857142855);
 //!
@@ -815,13 +815,12 @@ mod tests {
                             [4.],
                             [5.]];
         let test_y = array![0, 0, 2, 1, 0, 1, 0];
-        let max_k = 8;
+        let max_n = train_x.rows();
         let distance = euclidean_distance;
 
         // Test for k = 1.
-        let k = 1;
-        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(), k,
-                                        max_k, distance);
+        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(),
+                                        max_n, distance, KNNStrategy::NN);
 
         // FIXME: I'm not sure why in this case, differently from the
         // backward test, I need to include one more error and prediction.
@@ -848,10 +847,16 @@ mod tests {
         }
 
         // Test when changing k.
-        let k = 1;
-        let max_k = train_y.len();
-        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(), k,
-                                        max_k, distance);
+        let max_n = train_x.rows();
+        // Custom k_from_n.
+        let k_from_n = Box::new(|n| match n {
+            0..=3 => 1,
+            4..=6 => 4,
+            _ => 5,
+        });
+        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(),
+                                        max_n, distance,
+                                        KNNStrategy::Custom(k_from_n));
         let expected_error = vec![0.42857142857142855, 0.42857142857142855,
                                   0.42857142857142855, 0.5714285714285714,
                                   0.42857142857142855, 0.42857142857142855,
@@ -922,6 +927,7 @@ mod tests {
         assert_eq!(nn.predict(5).unwrap(), 0);
     }
 
+    /* FIXME: verify this test is still necessary.
     #[test]
     /// KNNEstimator's parameter updated_k should take ties into account.
     fn test_updated_k() {
@@ -929,19 +935,20 @@ mod tests {
         let test_y = array![1];
 
         let k = 1;
-        let max_k = 5;  // Essential that max_k > k for this test, otherwise
+        let max_n = 5;  // Essential that max_k > k for this test, otherwise
                         // it's a different check.
 
-        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(), k,
-                                        max_k, euclidean_distance);
+        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(),
+                                        max_n, euclidean_distance,
+                                        KNNStrategy::FixedK(5));
+        knn.k_from_n = knn_strategy(KNNStrategy::NN);
+
 
         // We'll only observe examples with distance 2 from x.
-        println!("asdf");
 
         // First all with label 0.
         for _ in 0..5 {
             knn.add_example(&array![2.].view(), 0).unwrap();
-            println!("asdf");
         }
 
         assert_eq!(knn.predictions, vec![0]);
@@ -949,9 +956,9 @@ mod tests {
         // Now we change the ties' label distribution to 1.
         for _ in 0..6 {
             knn.add_example(&array![2.].view(), 1).unwrap();
-            println!("asdf");
         }
 
         assert_eq!(knn.predictions, vec![1]);
     }
+    */
 }
