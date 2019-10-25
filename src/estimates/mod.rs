@@ -10,42 +10,16 @@ pub use self::convergence::ForwardChecker;
 
 use Label;
 use ndarray::prelude::*;
-
 use strsim::generic_levenshtein;
 
-/// A wrapper around estimators (e.g., frequentist/k-NN).
-pub enum Estimator<D>
-where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
-    KNN(KNNEstimator<D>, Box<dyn Fn(usize) -> usize>),
-    Frequentist(FrequentistEstimator),
-}
 
-impl<D> Estimator<D>
-where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
-    /// Inserts a new example in the training data, and returns
-    /// the current error estimate.
-    pub fn next(&mut self, n: usize, x: &ArrayView1<f64>, y: Label) -> Result<f64, ()> {
-        match self {
-            &mut Estimator::KNN(ref mut estimator, ref kn) => {
-                estimator.set_k(kn(n))?;
-                estimator.add_example(x, y)?;
-                Ok(estimator.get_error())
-            },
-            &mut Estimator::Frequentist(ref mut estimator) => {
-                estimator.add_example(*x, y);
-                Ok(estimator.get_error())
-            },
-        }
-    }
-
-    /// Returns the current error count.
-    pub fn error_count(&self) -> usize {
-        // TODO: let get_error_count() be part of a trait.
-        match self {
-            &Estimator::KNN(ref estimator, _) => estimator.get_error_count(),
-            &Estimator::Frequentist(ref estimator) => estimator.get_error_count(),
-        }
-    }
+pub trait BayesEstimator {
+    /// Adds a new training example.
+    fn add_example(&mut self, x: &ArrayView1<f64>, y: Label) -> Result<(), ()>;
+    /// Returns the current number of errors.
+    fn get_error_count(&self) -> usize;
+    /// Returns the current error rate.
+    fn get_error(&self) -> f64;
 }
 
 fn some_or_error<T>(opt: Option<T>) -> Result<T, ()> {
