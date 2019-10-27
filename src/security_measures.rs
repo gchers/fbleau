@@ -12,6 +12,20 @@ extern crate float_cmp;
 
 use self::float_cmp::approx_eq;
 
+
+/// Prints several security measures that can be derived from a Bayes risk
+/// estimate and Random guessing error.
+pub fn print_all_measures(bayes_risk_estimate: f64, random_guessing: f64) {
+    println!("Multiplicative Leakage: {}",
+             multiplicative_leakage(bayes_risk_estimate, random_guessing));
+    println!("Additive Leakage: {}",
+             additive_leakage(bayes_risk_estimate, random_guessing));
+    println!("Bayes security measure: {}",
+             bayes_security_measure(bayes_risk_estimate, random_guessing));
+    println!("Min-entropy Leakage: {}",
+             min_entropy_leakage(bayes_risk_estimate, random_guessing));
+}
+
 /// Computes the Multiplicative Leakage, as defined in [1].
 pub fn multiplicative_leakage(bayes_risk: f64, random_guessing: f64) -> f64 {
     assert!(!approx_eq!(f64, random_guessing, 0.),
