@@ -60,6 +60,47 @@ pub fn load_data<T>(fname: &str)
     Ok((inputs_a, Array::from_vec(targets)))
 }
 
+/// Prepare training and evaluation data.
+///
+/// It makes sure the labels are indexed starting from 0,
+/// and, if required, it scales the features.
+pub fn prepare_data(mut train_x: Array2<f64>, train_y: Array1<Label>,
+                    mut test_x: Array2<f64>, test_y: Array1<Label>,
+                    scale: bool) -> (Array2<f64>, Array1<Label>,
+                                     Array2<f64>, Array1<Label>, usize) {
+    // Remap labels so they are zero-based increasing numbers.
+    let (train_y, mapping) = vectors_to_ids(train_y.view()
+                                            .into_shape((train_y.len(), 1))
+                                            .unwrap(), None);
+    let train_nlabels = mapping.len();
+    // Remap test labels according to the mapping used for training labels.
+    let (test_y, mapping) = vectors_to_ids(test_y.view()
+                                           .into_shape((test_y.len(), 1))
+                                           .unwrap(), Some(mapping));
+    // The test labels should all have appeared in the training data;
+    // the reverse is not necessary. If new labels appear in test_y,
+    // the mapping is extended, so we can assert that didn't happen
+    // as follows.
+    let nlabels = mapping.len();
+    // NOTE (6/11/18): this assertion could be removed with an optional
+    // command line flag; indeed, to my understanding, this won't cause
+    // problems to the estimation. However, for the time being I'll keep
+    // it as it is, which is the "safest" option.
+    assert_eq!(nlabels, train_nlabels,
+               "Test data contains labels unseen in training data.
+                Each test label should appear in the training data;
+                the converse is not necessary");
+
+    // Scale features.
+    if train_x.cols() > 1 && scale {
+        println!("scaling features");
+        scale01(&mut train_x);
+        scale01(&mut test_x);
+    }
+
+    (train_x, train_y, test_x, test_y, nlabels)
+}
+
 /// Represents d-dimensional vector objects into 1-dimentional
 /// unique ids.
 pub fn vectors_to_ids(objects: ArrayView2<usize>,
