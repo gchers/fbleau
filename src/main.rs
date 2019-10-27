@@ -39,23 +39,16 @@
 //!
 //! Currently available estimates:
 //!
-//! **log** k-NN estimate, with `k = ln(n)`, where `n` is the number of training
-//! examples.
+//! - knn
+//! - frequentist
+//! - nn-bound
 //!
-//! **log 10** k-NN estimate, with `k = log10(n)`, where `n` is the number of
-//! training examples.
-//!
-//! **frequentist** (or "lookup table") Standard estimate. Note that this
-//! is only applicable when the outputs are finite; also, it does not scale
-//! well to large systems (e.g., large input/output spaces).
-//!
-//! Bounds and other estimates:
-//!
-//! **nn-bound** Produces a lower bound of R* discovered by Cover and Hard ('67),
-//! which is based on the error of the NN classifier (1-NN).
-//!
-//! **--knn** Runs the k-NN classifier for a fixed k to be specified.
-//! Note that this _does not_ guarantee convergence to the Bayes risk.
+//! NOTE: The `frequentist` strategy only converges if the observation space
+//! is finite. The `knn` estimator is guaranteed to converge (given enough data)
+//! even if the observation space is continuous, but only for strategies
+//! `ln` and `log10`.
+//! The `nn-bound` works for both continuous/finite spaces, but it guarantees
+//! to be a lower bound of the Bayes risk.
 //!
 //! ## Further options
 //!
