@@ -39,33 +39,23 @@
 //!
 //! Currently available estimates:
 //!
+//! - nn
 //! - knn
 //! - frequentist
 //! - nn-bound
 //!
-//! NOTE: The `frequentist` strategy only converges if the observation space
-//! is finite. The `knn` estimator is guaranteed to converge (given enough data)
-//! even if the observation space is continuous, but only for strategies
-//! `ln` and `log10`.
+//! NOTE: The `frequentist` and `nn` strategies only converge if the
+//! observation space is finite. The `knn` estimator is guaranteed to
+//! converge (given enough data) even if the observation space is continuous.
 //! The `nn-bound` works for both continuous/finite spaces, but it guarantees
 //! to be a lower bound of the Bayes risk.
 //!
-//! ## Further options
-//!
-//! By default, `fbleau` runs until a convergence criterion is met.
-//! We usually declare convergence if an estimate did not vary more
-//! than `--delta`, either in relative (default) or absolute
-//! (`--absolute`) value, from its value in the last `q` examples
-//! (where `q` is specified with `--qstop`).
-//! One can specify more than one deltas as comma-separated values, e.g.:
-//! `--delta=0.1,0.01,0.001`.
-//!
-//! Optionally, one may choose to let the estimator run for all the training
-//! set (`--run-all`), in which case `fbleau` will still report how many
-//! examples where required for convergence.
-//!
-//! When the system's outputs are vectors, `fbleau` by default does not
-//! scale their values. The option `--scale` allows scaling in 0-1.
+//! The `knn` option must be accompained by a `knn-strategy` option, whose
+//! value is in:
+//! - ln
+//! - log10
+//! The choice between the two cannot be done a priori: one should try both,
+//! and see which one produces the smallest estimate.
 extern crate ndarray;
 extern crate docopt;
 #[macro_use]
