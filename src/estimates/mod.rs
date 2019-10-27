@@ -19,6 +19,7 @@ use ndarray::prelude::*;
 #[derive(Deserialize)]
 #[serde(rename_all="lowercase")]
 pub enum Estimate {
+    NN,
     KNN,
     Frequentist,
     #[serde(rename="nn-bound")]
