@@ -124,8 +124,6 @@ pub fn vectors_to_ids(objects: ArrayView2<usize>,
         out.push(*id);
     }
 
-    println!("mapped vectors into {} unique IDs", next_id);
-
     (Array::from_vec(out), mapping)
 }
 
