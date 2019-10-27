@@ -632,8 +632,11 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
 
         // We sum the updates as i32, as they may be +1/-1.
         let update = error_updates?.iter().sum::<i32>();
-        assert!(update >= 0);
-        self.k_error_count += update as u32;
+        let error_count = (self.k_error_count as i32) + update;
+        // Make sure the error count is still positive -- otherwise there's
+        // some logic error.
+        assert!(error_count >= 0);
+        self.k_error_count = error_count as u32;
 
         Ok(())
     }
