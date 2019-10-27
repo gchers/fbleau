@@ -10,9 +10,10 @@ use estimates::{some_or_error};
 
 /// Returns relative or absolute change between two measurements.
 fn change(a: f64, b: f64, relative: bool) -> f64 {
-    match relative {
-        true => (a - b).abs() / b,
-        false => (a - b).abs(),
+    if relative {
+        (a - b).abs() / b
+    } else {
+        (a - b).abs()
     }
 }
 
@@ -47,11 +48,11 @@ pub struct ForwardChecker {
 }
 
 impl ForwardChecker {
-    pub fn new(deltas: &Vec<f64>, q: usize, relative: bool) -> ForwardChecker {
-        assert!(deltas.len() > 0);
+    pub fn new(deltas: &[f64], q: usize, relative: bool) -> ForwardChecker {
+        assert!(!deltas.is_empty());
 
         // Deltas need to be sorted.
-        let mut deltas = deltas.clone();
+        let mut deltas = deltas.to_owned();
         deltas.sort_by(|a, b| a.partial_cmp(b).unwrap());
         assert!(*deltas.get(0).unwrap() > 0.);
 
@@ -62,8 +63,8 @@ impl ForwardChecker {
                                     .map(|d| (OrderedFloat::from(*d), None))
                                     .collect(),
             next_deltas: deltas,
-            q: q,
-            relative: relative,
+            q,
+            relative,
         }
     }
 
@@ -97,12 +98,11 @@ impl ForwardChecker {
     }
 
     pub fn all_converged(&self) -> bool {
-        self.next_deltas.len() == 0
+        self.next_deltas.is_empty()
     }
 
     pub fn add_estimate(&mut self, e: f64) {
-        if self.next_deltas.len() == 0 {
-            // Everything already converged.
+        if self.all_converged() {
             return;
         }
         self.estimates.push_back(e);
@@ -144,7 +144,7 @@ impl ForwardChecker {
             *c = Some(self.first_n);
             // Update next delta.
             self.next_deltas.pop();
-            if self.next_deltas.len() == 0 {
+            if self.next_deltas.is_empty() {
                 // We don't need estimates anymore.
                 self.estimates.clear();
             }

@@ -28,7 +28,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         NNBoundEstimator {
             knn: KNNEstimator::new(test_x, test_y, max_n, distance,
                                    KNNStrategy::NN),
-            nlabels: nlabels,
+            nlabels,
         }
     }
 }

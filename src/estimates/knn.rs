@@ -81,8 +81,8 @@ impl Neighbor {
     /// Constructs a new Neighbor.
     fn new(distance: f64, label: Label) -> Neighbor {
         Neighbor {
-            distance: distance,
-            label: label,
+            distance,
+            label,
         }
     }
 }
@@ -152,8 +152,8 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
             extra_ties: HashMap::new(),
             extra_ties_dist: None,
             updated_k: 0,
-            max_k: max_k,
-            distance: distance,
+            max_k,
+            distance,
         }
     }
 
@@ -318,7 +318,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
     /// Returns the index of the first neighbor with the same distance as
     /// self.neighbors[i].
     fn first_of_ties(&self, mut i: usize) -> usize {
-        if i == 0  || self.neighbors.len() == 0 {
+        if i == 0  || self.neighbors.is_empty() {
             return 0;
         }
 
@@ -357,7 +357,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
         }
         else if approx_eq!(f64, self.neighbors.last().unwrap().distance, d) {
             // Handle ties.
-            if self.extra_ties.len() == 0 {
+            if self.extra_ties.is_empty() {
                 self.extra_ties_dist = Some(d);
             }
             // Could do this after.
@@ -383,7 +383,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
                 // Either add to ties, or remove all ties.
                 if approx_eq!(f64, last_neigh.distance, removed.distance) {
                     //self.ties.push(removed);
-                    if self.extra_ties.len() == 0 {
+                    if self.extra_ties.is_empty() {
                         self.extra_ties_dist = Some(removed.distance);
                     }
                     else {
@@ -441,7 +441,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
                max_n: usize, distance: D, strategy: KNNStrategy)
             -> KNNEstimator<D> {
         assert_eq!(test_x.rows(), test_y.len());
-        assert!(test_y.len() > 0);
+        assert!(!test_y.is_empty());
 
         // How we select k given n.
         let k_from_n = knn_strategy(strategy);
@@ -467,14 +467,14 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         let error_count = errors.iter().sum();
 
         KNNEstimator {
-            neighbors: neighbors,
-            errors: errors,
+            neighbors,
+            errors,
             predictions: vec![0; test_y.len()],
             labels: test_y.to_vec(),
             current_k: 1,
             k_error_count: error_count,
             n: 0,
-            k_from_n: k_from_n,
+            k_from_n,
         }
     }
 
@@ -486,8 +486,8 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         assert_eq!(train_x.cols(), test_x.cols());
         assert_eq!(train_x.rows(), train_y.len());
         assert_eq!(test_x.rows(), test_y.len());
-        assert!(train_x.len() > 0);
-        assert!(test_x.len() > 0);
+        assert!(!train_x.is_empty());
+        assert!(!test_x.is_empty());
 
         // How we select k given n.
         let k_from_n = knn_strategy(strategy);
@@ -520,14 +520,14 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         }
 
         KNNEstimator {
-            neighbors: neighbors,
-            errors: errors,
-            predictions: predictions,
+            neighbors,
+            errors,
+            predictions,
             labels: test_y.to_vec(),
             current_k: k,
             k_error_count: knn_error,
-            n: n,
-            k_from_n: k_from_n,
+            n,
+            k_from_n,
         }
     }
 
@@ -648,7 +648,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
 
     /// Returns the error for the current k.
     fn get_error(&self) -> f64 {
-        self.k_error_count as f64 / self.labels.len() as f64
+        f64::from(self.k_error_count) / (self.labels.len() as f64)
     }
 }
 

@@ -135,18 +135,18 @@ impl FrequentistEstimator {
         // according to priors.
         for &x in test_x.iter().unique() {
             joint_count.entry(x)
-                       .or_insert(FrequencyCount::new(n_labels));
+                       .or_insert_with(|| FrequencyCount::new(n_labels));
         }
 
         FrequentistEstimator {
-            joint_count: joint_count,
-            priors_count: priors_count,
+            joint_count,
+            priors_count,
             error_count: 0,
             train_x: vec![],
             train_y: vec![],
             test_x: test_x.to_vec(),
             test_y: test_y.to_vec(),
-            array_to_index: array_to_index,
+            array_to_index,
         }
     }
 
@@ -166,7 +166,7 @@ impl FrequentistEstimator {
         // according to priors.
         for &x in test_x.iter().unique() {
             joint_count.entry(x)
-                       .or_insert(FrequencyCount::new(n_labels));
+                       .or_insert_with(|| FrequencyCount::new(n_labels));
         }
 
 
@@ -198,9 +198,9 @@ impl FrequentistEstimator {
         }
 
         FrequentistEstimator {
-            joint_count: joint_count,
-            priors_count: priors_count,
-            error_count: error_count,
+            joint_count,
+            priors_count,
+            error_count,
             train_x: train_x.to_vec(),
             train_y: train_y.to_vec(),
             test_x: test_x.to_vec(),
@@ -292,7 +292,9 @@ impl BayesEstimator for FrequentistEstimator {
 
         let mut old_priors_pred = match self.priors_count.predict() {
             Some(pred) => pred,
-            None => { return Ok(self.add_first_example(x, y)) },
+            None => { self.add_first_example(x, y);
+                      return Ok(())
+                    },
         };
 
         // If max prior changed, update predictions for those that were
@@ -374,8 +376,8 @@ impl ArrayToIndex {
                  .map(|&x| OrderedFloat::from(x))
                  .collect::<Vec<_>>();
 
-        let ref mut mapping = self.mapping;
-        let ref mut next_id = self.next_id;
+        let mapping = &mut self.mapping;
+        let next_id = &mut self.next_id;
         let id = mapping.entry(x.to_owned())
                              .or_insert_with(|| { *next_id += 1;
                                                   *next_id - 1});

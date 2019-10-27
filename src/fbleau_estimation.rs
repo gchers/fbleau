@@ -44,7 +44,7 @@ pub fn run_fbleau(train_x: Array2<f64>, train_y: Array1<Label>,
             None => (train_x.len() as f64 * 0.1) as usize,
         };
         println!("will stop when (delta={}, q={})-converged", delta, q);
-        Some(ForwardChecker::new(&vec![delta], q, !absolute))
+        Some(ForwardChecker::new(&[delta], q, !absolute))
     } else if qstop.is_some() {
         panic!("--qstop should only be specified with --delta");
     } else {
