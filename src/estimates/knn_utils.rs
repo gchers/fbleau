@@ -34,10 +34,14 @@ pub fn levenshtein_distance(v1: &ArrayView1<f64>, v2: &ArrayView1<f64>) -> f64 {
 #[derive(Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum KNNStrategy {
-    NN,
-    FixedK(usize),
     Ln,
     Log10,
+    // We do not want to parse the following ones from the command line.
+    // So we ask serde to skip them.
+    #[serde(skip)]
+    NN,
+    #[serde(skip)]
+    FixedK(usize),
     #[serde(skip)]
     Custom(Box<dyn Fn(usize) -> usize>),
 }

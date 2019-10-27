@@ -95,12 +95,13 @@ Usage: fbleau <estimate> [knn-strategy] [options] <train> <eval>
        fbleau (--help | --version)
 
 Arguments:
-    estimate:   knn             k-NN rule.
+    estimate:   nn              Nearest Neighbor. Converges only if the
+                                observation space is finite.
+                knn             k-NN rule. Converges for finite/continuous
+                                observation spaces.
                 frequentist     Frequentist estimator. Converges only if the
                                 observation space is finite.
-    knn-strategy: nn            Nearest Neighbor. Converges only if the
-                                observation space is finite.
-                  ln            k-NN with k = ln(n).
+    knn-strategy: ln            k-NN with k = ln(n).
                   log10         k-NN with k = log10(n).
     train                       Training data (.csv file).
     eval                        Evaluation data (.csv file).
