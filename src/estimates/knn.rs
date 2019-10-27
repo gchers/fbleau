@@ -5,10 +5,10 @@
 //! changing k) on a test set, given training data.
 //! This module only exposes one public structure: `KNNEstimator`, which can be
 //! used as follows:
-//! 1) "train" `KNNEstimator` on the full training data, with some test data;
-//! 2) get the error of k-NN on test data;
-//! 3) remove one training example with `remove_one()`;
-//! 4) repeat from 2), until training data is finished.
+//! 1) Init `KNNEstimator` with selected evaluation (test) data;
+//! 2) Add a training example with `add_example()`.
+//! 3) Get the estimate (i.e., error) on the test data with `get_error()`.
+//! 4) Repeat from 2), until training data is finished.
 //!
 //! # Examples
 //!
