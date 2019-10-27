@@ -15,7 +15,7 @@ use ndarray_parallel::rayon;
 
 use fbleau::Label;
 use fbleau::estimates::*;
-use utils::{prepare_data, estimate_random_guessing};
+use utils::{prepare_data, estimate_random_guessing,has_integer_support};
 
 
 pub fn run_fbleau(train_x: Array2<f64>, train_y: Array1<Label>,
@@ -67,6 +67,9 @@ pub fn run_fbleau(train_x: Array2<f64>, train_y: Array1<Label>,
     // Init estimator and run.
     let (min_error, last_error) = match estimate {
         Estimate::Frequentist => {
+            if !has_integer_support(&train_x) || !has_integer_support(&test_x) {
+                println!("Warning: frequentist discouraged for continuous observations!");
+            }
             let estimator = FrequentistEstimator::new(nlabels,
                                                       &test_x.view(),
                                                       &test_y.view());
@@ -74,6 +77,9 @@ pub fn run_fbleau(train_x: Array2<f64>, train_y: Array1<Label>,
                                  train_x, train_y)
             },
         Estimate::NN => {
+            if !has_integer_support(&train_x) || !has_integer_support(&test_x) {
+                println!("Warning: NN discouraged for continuous observations!");
+            }
             let estimator = KNNEstimator::new(&test_x.view(), &test_y.view(),
                                               train_x.rows(), distance,
                                               KNNStrategy::NN);

@@ -101,6 +101,24 @@ pub fn prepare_data(mut train_x: Array2<f64>, train_y: Array1<Label>,
     (train_x, train_y, test_x, test_y, nlabels)
 }
 
+/// Returns true if all the elements of the vector
+/// can be converted into integers without loss.
+///
+/// # Examples
+///
+/// ```
+/// assert!(has_integer_support(vec![3, 6, 0, -4]));
+/// assert_ne!(has_integer_support(vec![2, 5.5, 3]);
+/// ```
+pub fn has_integer_support(v: &Array2<f64>) -> bool {
+    for x in v.iter() {
+        if x.fract() != 0. {
+            return false;
+        }
+    }
+    true
+}
+
 /// Represents d-dimensional vector objects into 1-dimentional
 /// unique ids.
 pub fn vectors_to_ids(objects: ArrayView2<usize>,
