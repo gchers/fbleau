@@ -15,7 +15,17 @@ pub use self::knn_utils::*;
 use Label;
 use ndarray::prelude::*;
 
+/// Estimators that F-BLEAU currently provides.
+#[derive(Deserialize)]
+#[serde(rename_all="lowercase")]
+pub enum Estimate {
+    KNN,
+    Frequentist,
+    #[serde(rename="nn-bound")]
+    NNBound,
+}
 
+/// Every estimator should implement this trait.
 pub trait BayesEstimator {
     /// Adds a new training example.
     fn add_example(&mut self, x: &ArrayView1<f64>, y: Label) -> Result<(), ()>;
