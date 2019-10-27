@@ -36,6 +36,8 @@ extern crate itertools;
 extern crate ndarray_parallel;
 extern crate ordered_float;
 extern crate float_cmp;
+#[macro_use]
+extern crate serde_derive;
 extern crate strsim;
 
 pub mod estimates;
