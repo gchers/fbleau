@@ -569,7 +569,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
 }
 
 impl<D> BayesEstimator for KNNEstimator<D>
-    where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
+where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     /// Adds a new example to the k-NN estimator's training data.
     ///
     /// This also updates the prediction, if necessary.
