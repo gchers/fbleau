@@ -33,7 +33,7 @@
 //!
 //! The general syntax is:
 //!
-//!     fbleau <estimate> [knn-strategy] [options] <train> <eval>
+//!     fbleau <estimate> [--knn-strategy=<strategy>] [options] <train> <eval>
 //!
 //! ## Estimates
 //!
@@ -50,7 +50,7 @@
 //! The `nn-bound` works for both continuous/finite spaces, but it guarantees
 //! to be a lower bound of the Bayes risk.
 //!
-//! The `knn` option must be accompained by a `knn-strategy` option, whose
+//! The `knn` option must be accompained by a `--knn-strategy` flag, whose
 //! value is in:
 //! - ln
 //! - log10
@@ -81,7 +81,7 @@ use utils::load_data;
 const USAGE: &str = "
 Estimate k-NN error and convergence.
 
-Usage: fbleau <estimate> [knn-strategy] [options] <train> <eval>
+Usage: fbleau <estimate> [--knn-strategy=<strategy>] [options] <train> <eval>
        fbleau (--help | --version)
 
 Arguments:
@@ -118,7 +118,7 @@ Options:
 #[derive(Deserialize)]
 struct Args {
     arg_estimate: Estimate,
-    arg_knn_strategy: Option<KNNStrategy>,
+    flag_knn_strategy: Option<KNNStrategy>,
     flag_logfile: Option<String>,
     flag_delta: Option<f64>,
     flag_qstop: Option<usize>,
@@ -147,7 +147,7 @@ fn main() {
 
     let (min_error, _, random_guessing) = 
         run_fbleau(train_x, train_y, eval_x, eval_y, args.arg_estimate,
-                   args.arg_knn_strategy, args.flag_distance, args.flag_logfile,
+                   args.flag_knn_strategy, args.flag_distance, args.flag_logfile,
                    args.flag_nprocs, args.flag_delta, args.flag_qstop,
                    args.flag_absolute, args.flag_scale);
 
