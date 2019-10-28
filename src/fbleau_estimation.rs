@@ -8,11 +8,9 @@
 ///     - final estimate (i.e., the estimate when all the training data was
 ///       available)
 ///     - random guessing error.
-extern crate rayon;
 use ndarray::*;
 use std::fs::File;
 use std::io::Write;
-use self::rayon::ThreadPoolBuilder;
 
 use fbleau::Label;
 use fbleau::estimates::*;
@@ -23,16 +21,9 @@ pub fn run_fbleau(train_x: Array2<f64>, train_y: Array1<Label>,
                   test_x: Array2<f64>, test_y: Array1<Label>,
                   estimate: Estimate, knn_strategy: Option<KNNStrategy>,
                   distance: Option<String>, logfile: Option<String>,
-                  nprocs: Option<usize>, delta: Option<f64>,
-                  qstop: Option<usize>, absolute: bool, scale: bool)
+                  delta: Option<f64>, qstop: Option<usize>, absolute: bool,
+                  scale: bool)
         -> (f64, f64, f64) {
-    // Number of processes.
-    if let Some(nprocs) = nprocs {
-        ThreadPoolBuilder::new()
-                          .num_threads(nprocs)
-                          .build_global()
-                          .unwrap();
-    }
 
     // Check label's indexes, and scale data if required.
     let (train_x, train_y, test_x, test_y, nlabels) =

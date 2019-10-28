@@ -58,7 +58,6 @@
 //! ```
 use std;
 use ndarray::*;
-use ndarray::parallel::prelude::*;
 use std::collections::HashMap;
 use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
@@ -451,7 +450,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         let max_k = k_from_n(max_n);
 
         let neighbors = test_x.outer_iter()
-                              .into_par_iter()
+                              .into_iter()
                               .map(|x| NearestNeighbors::new(&x, max_k, distance))
                               .collect::<Vec<_>>();
         // We initially set all predictions to 0. Therefore, we need to
@@ -494,7 +493,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         let max_k = k_from_n(max_n);
 
         let neighbors = test_x.outer_iter()
-                            .into_par_iter()
+                            .into_iter()
                             .map(|x| NearestNeighbors::from_data(&x,
                                                            &train_x.view(),
                                                            &train_y.view(),
@@ -582,7 +581,10 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
 
         // We do all this in this gigantic closure so that we can
         // parallelize it with rayon.
-        let error_updates: Result<Vec<_>, ()> = self.neighbors.par_iter_mut()
+        // TODO: we now don't parallelize this anymore; this means
+        // we can write this in a nicer way, which may be even easier
+        // for rustc to optimize.
+        let error_updates: Result<Vec<_>, ()> = self.neighbors.iter_mut()
             .zip(&self.labels)
             .zip(&mut self.predictions)
             .zip(&mut self.errors)

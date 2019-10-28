@@ -106,8 +106,6 @@ Options:
     --scale                     Scale features before running k-NN
                                 (only makes sense for objects of 2 or more
                                 dimensions).
-    --nprocs=<n>                Number of threads to spawn. By default it is
-                                the number of available CPUs.
     --distance=<name>           Distance metric in (\"euclidean\",
                                 \"levenshtein\").
     -h, --help                  Show help.
@@ -123,7 +121,6 @@ struct Args {
     flag_qstop: Option<usize>,
     flag_absolute: bool,
     flag_scale: bool,
-    flag_nprocs: Option<usize>,
     flag_distance: Option<String>,
     arg_train: String,
     arg_eval: String,
@@ -147,8 +144,8 @@ fn main() {
     let (min_error, _, random_guessing) = 
         run_fbleau(train_x, train_y, eval_x, eval_y, args.arg_estimate,
                    args.flag_knn_strategy, args.flag_distance, args.flag_logfile,
-                   args.flag_nprocs, args.flag_delta, args.flag_qstop,
-                   args.flag_absolute, args.flag_scale);
+                   args.flag_delta, args.flag_qstop, args.flag_absolute,
+                   args.flag_scale);
 
     println!();
     println!("Minimum estimate: {}", min_error);

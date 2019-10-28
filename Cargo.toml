@@ -19,8 +19,7 @@ csv = "1.0.0"
 ordered-float = "0.5.0"
 float-cmp = "0.5.2"
 strsim = "0.9.1"
-ndarray = { version = "0.13.0", features = ["rayon"] }
-rayon = "1.0.3"
+ndarray = "0.13.0"
 
 [dev-dependencies]
 rustlearn = "0.5.0"
