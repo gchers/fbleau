@@ -51,13 +51,13 @@ pub fn load_data<T>(fname: &str)
 
     let inputs_a = if let Some(d) = ncols {
         let n = inputs.len() / d;
-        Array::from_vec(inputs)
+        Array::from(inputs)
               .into_shape((n, d))?
     } else {
         panic!("File has wrong format");
     };
 
-    Ok((inputs_a, Array::from_vec(targets)))
+    Ok((inputs_a, Array::from(targets)))
 }
 
 /// Prepare training and evaluation data.
@@ -92,7 +92,7 @@ pub fn prepare_data(mut train_x: Array2<f64>, train_y: Array1<Label>,
                 the converse is not necessary");
 
     // Scale features.
-    if train_x.cols() > 1 && scale {
+    if train_x.ncols() > 1 && scale {
         println!("scaling features");
         scale01(&mut train_x);
         scale01(&mut test_x);
@@ -124,7 +124,7 @@ pub fn has_integer_support(v: &Array2<f64>) -> bool {
 pub fn vectors_to_ids(objects: ArrayView2<usize>,
         mapping: Option<HashMap<Array1<usize>, usize>>)
         -> (Array1<usize>, HashMap<Array1<usize>, usize>) {
-    let mut out = Vec::with_capacity(objects.rows());
+    let mut out = Vec::with_capacity(objects.nrows());
 
     let mut next_id = 0;
     let mut mapping = if let Some(mapping) = mapping {
@@ -142,13 +142,13 @@ pub fn vectors_to_ids(objects: ArrayView2<usize>,
         out.push(*id);
     }
 
-    (Array::from_vec(out), mapping)
+    (Array::from(out), mapping)
 }
 
 /// Scales columns' values in [0,1] with min-max scaling.
 pub fn scale01(matrix: &mut Array2<f64>) {
-    let mut max = Array::ones(matrix.cols()) * -f64::INFINITY;
-    let mut min = Array::ones(matrix.cols()) * f64::INFINITY;
+    let mut max = Array::ones(matrix.ncols()) * -f64::INFINITY;
+    let mut min = Array::ones(matrix.ncols()) * f64::INFINITY;
 
     for row in matrix.outer_iter() {
         for i in 0..row.len() {

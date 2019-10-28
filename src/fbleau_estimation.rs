@@ -8,10 +8,11 @@
 ///     - final estimate (i.e., the estimate when all the training data was
 ///       available)
 ///     - random guessing error.
+extern crate rayon;
 use ndarray::*;
 use std::fs::File;
 use std::io::Write;
-use ndarray_parallel::rayon;
+use self::rayon::ThreadPoolBuilder;
 
 use fbleau::Label;
 use fbleau::estimates::*;
@@ -27,10 +28,10 @@ pub fn run_fbleau(train_x: Array2<f64>, train_y: Array1<Label>,
         -> (f64, f64, f64) {
     // Number of processes.
     if let Some(nprocs) = nprocs {
-        rayon::ThreadPoolBuilder::new()
-                                 .num_threads(nprocs)
-                                 .build_global()
-                                 .unwrap();
+        ThreadPoolBuilder::new()
+                          .num_threads(nprocs)
+                          .build_global()
+                          .unwrap();
     }
 
     // Check label's indexes, and scale data if required.
@@ -59,9 +60,9 @@ pub fn run_fbleau(train_x: Array2<f64>, train_y: Array1<Label>,
 
     // Distance for k-NN (defaults to Euclidean).
     let distance = match distance.as_ref().map(String::as_ref) {
-        Some("euclidean") => fbleau::estimates::euclidean_distance,
-        Some("levenshtein") => fbleau::estimates::levenshtein_distance,
-        _ => fbleau::estimates::euclidean_distance
+        Some("euclidean") => euclidean_distance,
+        Some("levenshtein") => levenshtein_distance,
+        _ => euclidean_distance,
     };
 
     // Init estimator and run.
@@ -81,14 +82,14 @@ pub fn run_fbleau(train_x: Array2<f64>, train_y: Array1<Label>,
                 println!("Warning: NN discouraged for continuous observations!");
             }
             let estimator = KNNEstimator::new(&test_x.view(), &test_y.view(),
-                                              train_x.rows(), distance,
+                                              train_x.nrows(), distance,
                                               KNNStrategy::NN);
             run_forward_strategy(estimator, convergence_checker, logfile,
                                  train_x, train_y)
             },
         Estimate::KNN => {
             let estimator = KNNEstimator::new(&test_x.view(), &test_y.view(),
-                                              train_x.rows(), distance,
+                                              train_x.nrows(), distance,
                                               knn_strategy.expect(
                                                   "Specify a k-NN strategy."));
             run_forward_strategy(estimator, convergence_checker, logfile,

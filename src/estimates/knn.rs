@@ -35,7 +35,7 @@
 //!                     [4.],
 //!                     [5.]];
 //! let test_y = array![0, 0, 2, 1, 0, 1, 0];
-//! let max_n = train_x.rows();
+//! let max_n = train_x.nrows();
 //! 
 //! let k = 3;
 //! let mut knn = KNNEstimator::from_data(&train_x.view(), &train_y.view(),
@@ -58,9 +58,8 @@
 //! ```
 use std;
 use ndarray::*;
-use ndarray_parallel::rayon::prelude::*;
+use ndarray::parallel::prelude::*;
 use std::collections::HashMap;
-use ndarray_parallel::prelude::*;
 use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
 use float_cmp::approx_eq;
@@ -440,7 +439,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     pub fn new(test_x: &ArrayView2<f64>, test_y: &ArrayView1<Label>,
                max_n: usize, distance: D, strategy: KNNStrategy)
             -> KNNEstimator<D> {
-        assert_eq!(test_x.rows(), test_y.len());
+        assert_eq!(test_x.nrows(), test_y.len());
         assert!(!test_y.is_empty());
 
         // How we select k given n.
@@ -483,9 +482,9 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
             test_x: &ArrayView2<f64>, test_y: &ArrayView1<Label>,
             max_n: usize, distance: D, strategy: KNNStrategy)
             -> KNNEstimator<D> {
-        assert_eq!(train_x.cols(), test_x.cols());
-        assert_eq!(train_x.rows(), train_y.len());
-        assert_eq!(test_x.rows(), test_y.len());
+        assert_eq!(train_x.ncols(), test_x.ncols());
+        assert_eq!(train_x.nrows(), train_y.len());
+        assert_eq!(test_x.nrows(), test_y.len());
         assert!(!train_x.is_empty());
         assert!(!test_x.is_empty());
 
@@ -818,7 +817,7 @@ mod tests {
                             [4.],
                             [5.]];
         let test_y = array![0, 0, 2, 1, 0, 1, 0];
-        let max_n = train_x.rows();
+        let max_n = train_x.nrows();
         let distance = euclidean_distance;
 
         // Test for k = 1.
@@ -850,7 +849,7 @@ mod tests {
         }
 
         // Test when changing k.
-        let max_n = train_x.rows();
+        let max_n = train_x.nrows();
         // Custom k_from_n.
         let k_from_n = Box::new(|n| match n {
             0..=3 => 1,

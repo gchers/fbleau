@@ -62,7 +62,6 @@ extern crate docopt;
 extern crate serde_derive;
 extern crate serde_json;
 extern crate itertools;
-extern crate ndarray_parallel;
 extern crate strsim;
 
 extern crate fbleau;
