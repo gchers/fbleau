@@ -189,7 +189,6 @@ pub fn estimate_random_guessing(labels: &ArrayView1<usize>) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ndarray::*;
 
     #[test]
     fn test_vectors_to_ids() {

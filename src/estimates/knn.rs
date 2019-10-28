@@ -579,65 +579,38 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         // We copy because we're using them in the closure below.
         let current_k = self.current_k;
 
-        // We do all this in this gigantic closure so that we can
-        // parallelize it with rayon.
-        // TODO: we now don't parallelize this anymore; this means
-        // we can write this in a nicer way, which may be even easier
-        // for rustc to optimize.
-        let error_updates: Result<Vec<_>, ()> = self.neighbors.iter_mut()
-            .zip(&self.labels)
-            .zip(&mut self.predictions)
-            .zip(&mut self.errors)
-            // The closure in the following filter_map() returns an
-            // Option<Result<f64, ()>>, where None is returned if there's
-            // no need to update, Some(Ok(update)) is returned when the
-            // current error needs updating +=update, and Some(Err(()))
-            // is returned when an error occours;
-            // I could not find a better way to catch and return the
-            // errors within iter(), but maybe there's a better way.
-            .filter_map(|(((neigh, true_y), old_pred), old_error)| {
-                if neigh.add_example(x, y) {
-                    if neigh.updated_k > current_k {
-                        return None;
-                    }
-
-                    // Update prediction.
-                    let pred = match neigh.predict(current_k) {
-                        Ok(pred) => pred,
-                        _ => return Some(Err(())),
-                    };
-                    if pred == *old_pred {
-                        return None;
-                    }
-
-                    // Update error.
-                    let error = if pred != *true_y { 1 } else { 0 };
-
-                    *old_pred = pred;
-
-                    let update = match (error, *old_error) {
-                        (1, 0) => 1,
-                        (0, 1) => -1,
-                        // No need to update. Note that we do not need
-                        // to set *old_error = error either, as they're
-                        // also the same. So we can return now.
-                        _ => { return None },
-                    };
-
-                    *old_error = error;
-                    return Some(Ok(update));
+        // Update errors and neighbors as appropriate.
+        for (neigh, true_y, old_pred, old_error) in
+                izip!(&mut self.neighbors, &self.labels,
+                      &mut self.predictions, &mut self.errors) {
+            if neigh.add_example(x, y) {
+                if neigh.updated_k > current_k {
+                    continue;
                 }
-                None
-            })
-            .collect();
 
-        // We sum the updates as i32, as they may be +1/-1.
-        let update = error_updates?.iter().sum::<i32>();
-        let error_count = (self.k_error_count as i32) + update;
-        // Make sure the error count is still positive -- otherwise there's
-        // some logic error.
-        assert!(error_count >= 0);
-        self.k_error_count = error_count as u32;
+                // Update prediction.
+                let pred = neigh.predict(current_k)?;
+                if pred == *old_pred {
+                    continue;
+                }
+
+                // Update error.
+                let error = if pred != *true_y { 1 } else { 0 };
+
+                *old_pred = pred;
+
+                match (error, *old_error) {
+                    (1, 0) => { self.k_error_count += 1 },
+                    (0, 1) => { self.k_error_count -= 1 },
+                    // No need to update. Note that we do not need
+                    // to set *old_error = error either, as they're
+                    // also the same. So we can return now.
+                    _ => { continue },
+                };
+
+                *old_error = error;
+            }
+        }
 
         Ok(())
     }
