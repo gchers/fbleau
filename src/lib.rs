@@ -36,9 +36,12 @@ extern crate itertools;
 extern crate ordered_float;
 extern crate float_cmp;
 #[macro_use]
-extern crate serde_derive;
+extern crate serde;
 extern crate strsim;
 
 pub mod estimates;
+pub mod fbleau_estimation;
+pub mod security_measures;
+pub mod utils;
 
 pub type Label = usize;

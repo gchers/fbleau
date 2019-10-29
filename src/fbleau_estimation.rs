@@ -12,8 +12,8 @@ use ndarray::*;
 use std::fs::File;
 use std::io::Write;
 
-use fbleau::Label;
-use fbleau::estimates::*;
+use Label;
+use estimates::*;
 use utils::{prepare_data, estimate_random_guessing,has_integer_support};
 
 

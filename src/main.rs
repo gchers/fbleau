@@ -59,23 +59,18 @@
 extern crate ndarray;
 extern crate docopt;
 #[macro_use]
-extern crate serde_derive;
-extern crate serde_json;
+extern crate serde;
 extern crate itertools;
 extern crate strsim;
 
 extern crate fbleau;
 
-mod utils;
-mod fbleau_estimation;
-mod security_measures;
-
 use docopt::Docopt;
 
 use fbleau::estimates::*;
-use security_measures::*;
-use fbleau_estimation::run_fbleau;
-use utils::load_data;
+use fbleau::security_measures::*;
+use fbleau::fbleau_estimation::run_fbleau;
+use fbleau::utils::load_data;
 
 const USAGE: &str = "
 Estimate k-NN error and convergence.

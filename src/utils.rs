@@ -1,15 +1,12 @@
 //! Utility routines for loading and storing data into files.
-extern crate csv;
-
 use ndarray::prelude::*;
 use std::error::Error;
 use std::collections::HashMap;
-// FIXME: not sure how to remove "self" from the line below.
-use self::csv::ReaderBuilder;
+use csv::ReaderBuilder;
 use std::str::FromStr;
 use std::f64;
 
-use fbleau::Label;
+use Label;
 
 /// Loads a CSV data file.
 ///
