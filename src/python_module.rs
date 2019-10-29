@@ -8,8 +8,32 @@ use Label;
 use estimates::*;
 use fbleau_estimation::run_fbleau;
 
+/// F-BLEAU is a tool for estimating the leakage of a system about its secrets
+/// in a black-box manner (i.e., by only looking at examples of secret inputs
+/// and respective outputs). It considers a generic system as a black-box,
+/// taking secret inputs and returning outputs accordingly, and it measures
+/// how much the outputs "leak" about the inputs.
 #[pymodule(fbleau)]
 fn pyfbleau(_py: Python, m: &PyModule) -> PyResult<()> {
+    /// run_fbleau(train_x, train_y, test_x, test_y, estimate, knn_strategy,
+    /// distance, logfile, delta, qstop, absolute, scale)
+    /// --
+    ///
+    /// Run F-BLEAU for the chosen estimate.
+    ///
+    /// Keyword arguments:
+    /// train_x : training observations
+    /// train_y : training secrets
+    /// test_x : test observations
+    /// test_y : test secrets
+    /// estimate : estimate, value in ("nn", "knn", "frequentist", "nn-bound")
+    /// knn_strategy : if estimate is "knn", specify one in ("ln", "log10")
+    /// distance : the distance used for NN or k-NN
+    /// logfile : if specified, log the estimate values at every step in this file
+    /// delta : use to stop fbleau when it reaches (delta, qstop)-convergence
+    /// qstop : use to stop fbleau when it reaches (delta, qstop)-convergence
+    /// absolute : measure absolute instead of relative convergence
+    /// scale : scale observations' features in [0,1]
 	#[pyfn(m, "run_fbleau")]
 	fn run_fbleau_py(_py: Python,
                      train_x: &PyArray2<f64>, train_y: &PyArray1<Label>,
