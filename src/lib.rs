@@ -38,8 +38,11 @@ extern crate float_cmp;
 #[macro_use]
 extern crate serde;
 extern crate strsim;
+extern crate pyo3;
+extern crate numpy;
 
 pub mod estimates;
+pub mod python_module;
 pub mod fbleau_estimation;
 pub mod security_measures;
 pub mod utils;
