@@ -98,16 +98,21 @@ pub fn prepare_data(mut train_x: Array2<f64>, train_y: Array1<Label>,
     (train_x, train_y, test_x, test_y, nlabels)
 }
 
-/// Returns true if all the elements of the vector
+/// Returns true if all the elements of the array
 /// can be converted into integers without loss.
 ///
 /// # Examples
 ///
 /// ```
-/// assert!(has_integer_support(vec![3, 6, 0, -4]));
-/// assert_ne!(has_integer_support(vec![2, 5.5, 3]);
+/// # extern crate ndarray;
+/// # extern crate fbleau;
+/// # use ndarray::prelude::*;
+/// # use fbleau::utils::has_integer_support;
+/// assert!(has_integer_support(&array![[3.], [6.], [0.], [-4.]]));
+/// assert!(has_integer_support(&array![3., 6., 0., -4.]));
+/// assert!(!has_integer_support(&array![2., 5.5, 3.]));
 /// ```
-pub fn has_integer_support(v: &Array2<f64>) -> bool {
+pub fn has_integer_support<D: ndarray::Dimension>(v: &Array<f64, D>) -> bool {
     for x in v.iter() {
         if x.fract() != 0. {
             return false;
