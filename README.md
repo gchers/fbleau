@@ -36,97 +36,100 @@ and relative security measures.
 
 The general syntax is:
 
-    fbleau <estimate> [options] <train> <test>
+```
+fbleau <estimate> [--knn-strategy=<strategy>] [options] <train> <eval>
 
-## Estimates
-
-Currently available estimates:
-
-**log** k-NN estimate, with `k = ln(n)`, where `n` is the number of training
-examples.
-
-**log 10** k-NN estimate, with `k = log10(n)`, where `n` is the number of
-training examples.
-
-**frequentist** (or "lookup table") Standard estimate. Note that this
-is only applicable when the outputs are finite; also, it does not scale
-well to large systems (e.g., large input/output spaces).
-
-Bounds and other estimates:
-
-**nn-bound** Produces a lower bound of R* discovered by Cover and Hard ('67),
-which is based on the error of the NN classifier (1-NN).
-
-**--knn** Runs the k-NN classifier for a fixed k to be specified.
-Note that this _does not_ guarantee convergence to the Bayes risk.
+Arguments:
+    estimate:   nn              Nearest Neighbor. Converges only if the
+                                observation space is finite.
+                knn             k-NN rule. Converges for finite/continuous
+                                observation spaces.
+                frequentist     Frequentist estimator. Converges only if the
+                                observation space is finite.
+    knn-strategy: ln            k-NN with k = ln(n).
+                  log10         k-NN with k = log10(n).
+    train                       Training data (.csv file).
+    eval                        Validation data (.csv file).
+```
 
 ## Example
 
 This example considers 100K observations generated according to a
 Geometric distribution with privacy level `nu=4` (see [2] for details);
-the true value of the Bayes risk is `R*=0.456` computed analytically.
+the true value of the Bayes risk is `R*=0.456`, computed analytically.
 The observations are split into training (80%) and test sets
 (`examples/geometric-4.train.csv` and `examples/geometric-4.test.csv`
 respectively).
 
-One can run `fbleau` to compute the `log` estimate as follows:
+One can run `fbleau` to compute the `knn` estimate with `ln` strategy
+(see below for details about estimation methods) as follows:
 
 ```console
-$ fbleau log examples/geometric-4.train.csv examples/geometric-4.test.csv
-mapped vectors into 191 unique IDs
-mapped vectors into 191 unique IDs
+$ fbleau knn --knn-strategy ln examples/geometric-4.train.csv examples/geometric-4.test.csv
 Random guessing error: 0.913
 Estimating leakage measures...
 
-Final estimate: 0.47475
-Multiplicative Leakage: 6.037356321839082
-Additive Leakage: 0.43825000000000003
-Bayes security measure: 0.5199890470974808
-Min-entropy Leakage: 2.593916950824318
+Minimum estimate: 0.473
+Multiplicative Leakage: 6.057471264367819
+Additive Leakage: 0.44000000000000006
+Bayes security measure: 0.5180722891566265
+Min-entropy Leakage: 2.5987156557884865
+You have new mail in /var/mail/joker
 
-Minimum estimate: 0.47355
-Multiplicative Leakage: 6.051149425287359
-Additive Leakage: 0.43945
-Bayes security measure: 0.5186746987951807
-Min-entropy Leakage: 2.5972092105949125
 ```
 
 NOTE: depending on your machine's specs this may take a while.
-`fbleau` is designed to effectively exploit many CPUs, albeit with low RAM requirements;
-further optimisations are in the works.
 
-One should look at the `Minimum estimate` (i.e., the minimum value that
-the Bayes risk estimate took as the size of the training examples increases),
-rather than at the `Final estimate`: indeed, the estimates do not guarantee
-a monotonically decreasing behaviour.
+By default, F-BLEAU runs the estimator on an increasing number of
+training examples, and it computes the estimate at every step.
+The returned estimate of R* (here, 0.473) is the smallest one
+observed in this process.
 
-For the `frequentist` estimate:
+To log the estimates at every step, specify a log file with
+`--logfile <logfile>`.
 
-```console
-$ fbleau frequentist examples/geometric-4.train.csv examples/geometric-4.test.csv
-mapped vectors into 191 unique IDs
-mapped vectors into 191 unique IDs
-Random guessing error: 0.913
-Estimating leakage measures...
+## Estimates
 
-Final estimate: 0.5621
-Multiplicative Leakage: 5.033333333333335
-Additive Leakage: 0.3509
-Bayes security measure: 0.6156626506024097
-Min-entropy Leakage: 2.3315141437165607
+In principle, one should try as many estimation methods as possible, and select
+the one that produced the smallest estimate [2].
+However, some estimators are better indicated for certain cases.
+The following table shows: i) when an estimator is guaranteed to converge
+to the correct value (provided with enough data), and ii) if they're indicated
+for small or large systems.
+Indicatively, a small system has up to 1K possible output values; a large system
+may have much larger output spaces.
 
-Minimum estimate: 0.56205
-Multiplicative Leakage: 5.033908045977013
-Additive Leakage: 0.35095
-Bayes security measure: 0.6156078860898139
-Min-entropy Leakage: 2.3316788631368333
+| Estimate | Options | Convergence | Use cases |
+| -------- | ---------------- | ----------- | --------- |
+| **frequentist** |  | If the output space is finite | Small systems |
+| **nn**  |  | If the output space is finite | Small/large systems |
+| **knn**  | `--knn-strategy` | Always  | Small/large systems |
+| **nn-bound** | | Always (Note, however, that this is a lower bound) | Small/large systems |
+
+For example:
+```
+fbleau nn <train> <test>
 ```
 
-## Further options
+Further details are in [2].
 
-It is often useful to know the value of an estimate at every step
-(i.e., for training size 1, 2, ...).
-`fbleau` can output this into a file specified by `--verbose=<logfile>`.
+### k-NN strategies
+k-NN estimators also require defining a "strategy".
+Currently implemented strategies are:
+
+**ln** k-NN estimator with `k = ln(n)`, where `n` is the number of training
+examples.
+
+**log 10** k-NN estimator with `k = log10(n)`, where `n` is the number of
+training examples.
+
+For example, you can run:
+```
+fbleau knn --knn-strategy log10 <train> <test>
+```
+
+
+## Further options
 
 By default, `fbleau` runs for all training data.
 However, one can specify a stopping criterion, in the form of a
@@ -137,9 +140,6 @@ absolute (`--absolute`) sense, for at least q steps (`--qstop`).
 `fbleau` can scale the individual values of the system's output ("features")
 in the `[0,1]` interval by specifying the `--scale` flag.
 
-By default, `fbleau` uses a number of threads equal to the number of CPUs.
-To limit this number, you can use `--nprocs`.
-
 An option `--distance` is available to select the desired distance metric
 for nearest neighbor methods.
 
@@ -148,7 +148,7 @@ Further options are shown in the help page:
 fbleau -h
 ```
 
-# Install
+# Installation
 
 The code is written in `Rust`, but it is thought to be used as a
 standalone command line tool.
@@ -194,7 +194,7 @@ Currently, the code provided here:
 ### Maybe
 
 - [ ] other ML methods (e.g., SVM, neural network)
-- [ ] Python and Java bindings
+- [ ] Python bindings
 
 
 # References
