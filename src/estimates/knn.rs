@@ -450,7 +450,6 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         let max_k = k_from_n(max_n);
 
         let neighbors = test_x.outer_iter()
-                              .into_iter()
                               .map(|x| NearestNeighbors::new(&x, max_k, distance))
                               .collect::<Vec<_>>();
         // We initially set all predictions to 0. Therefore, we need to
@@ -493,7 +492,6 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         let max_k = k_from_n(max_n);
 
         let neighbors = test_x.outer_iter()
-                            .into_iter()
                             .map(|x| NearestNeighbors::from_data(&x,
                                                            &train_x.view(),
                                                            &train_y.view(),
