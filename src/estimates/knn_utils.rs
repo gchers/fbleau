@@ -1,3 +1,7 @@
+use ndarray::prelude::*;
+use strsim::generic_levenshtein;
+
+
 /// Computes the NN bound derived from Cover&Hart, given
 /// the error and the number of labels.
 pub fn nn_bound(error: f64, nlabels: usize) -> f64 {
@@ -11,13 +15,34 @@ pub fn nn_bound(error: f64, nlabels: usize) -> f64 {
     }
 }
 
-/// Stragegies for selecting `k` for k-NN given the number of
+/// Returns the Euclidean distance between two vectors of f64 values.
+pub fn euclidean_distance(v1: &ArrayView1<f64>, v2: &ArrayView1<f64>) -> f64 {
+    v1.iter()
+      .zip(v2.iter())
+      .map(|(x,y)| (x - y).powi(2))
+      .sum::<f64>()
+      .sqrt()
+}
+
+/// Returns the Levenshtein distance between two vectors of f64 values.
+pub fn levenshtein_distance(v1: &ArrayView1<f64>, v2: &ArrayView1<f64>) -> f64 {
+    generic_levenshtein(v1, v2) as f64
+}
+
+/// Strategies for selecting `k` for k-NN given the number of
 /// training examples `n`.
+#[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum KNNStrategy {
-    NN,
-    FixedK(usize),
     Ln,
     Log10,
+    // We do not want to parse the following ones from the command line.
+    // So we ask serde to skip them.
+    #[serde(skip)]
+    NN,
+    #[serde(skip)]
+    FixedK(usize),
+    #[serde(skip)]
     Custom(Box<dyn Fn(usize) -> usize>),
 }
 

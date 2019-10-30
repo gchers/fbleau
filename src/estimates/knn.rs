@@ -5,10 +5,10 @@
 //! changing k) on a test set, given training data.
 //! This module only exposes one public structure: `KNNEstimator`, which can be
 //! used as follows:
-//! 1) "train" `KNNEstimator` on the full training data, with some test data;
-//! 2) get the error of k-NN on test data;
-//! 3) remove one training example with `remove_one()`;
-//! 4) repeat from 2), until training data is finished.
+//! 1) Init `KNNEstimator` with selected evaluation (test) data;
+//! 2) Add a training example with `add_example()`.
+//! 3) Get the estimate (i.e., error) on the test data with `get_error()`.
+//! 4) Repeat from 2), until training data is finished.
 //!
 //! # Examples
 //!
@@ -35,7 +35,7 @@
 //!                     [4.],
 //!                     [5.]];
 //! let test_y = array![0, 0, 2, 1, 0, 1, 0];
-//! let max_n = train_x.rows();
+//! let max_n = train_x.nrows();
 //! 
 //! let k = 3;
 //! let mut knn = KNNEstimator::from_data(&train_x.view(), &train_y.view(),
@@ -58,9 +58,7 @@
 //! ```
 use std;
 use ndarray::*;
-use ndarray_parallel::rayon::prelude::*;
 use std::collections::HashMap;
-use ndarray_parallel::prelude::*;
 use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
 use float_cmp::approx_eq;
@@ -81,8 +79,8 @@ impl Neighbor {
     /// Constructs a new Neighbor.
     fn new(distance: f64, label: Label) -> Neighbor {
         Neighbor {
-            distance: distance,
-            label: label,
+            distance,
+            label,
         }
     }
 }
@@ -152,8 +150,8 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
             extra_ties: HashMap::new(),
             extra_ties_dist: None,
             updated_k: 0,
-            max_k: max_k,
-            distance: distance,
+            max_k,
+            distance,
         }
     }
 
@@ -318,7 +316,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
     /// Returns the index of the first neighbor with the same distance as
     /// self.neighbors[i].
     fn first_of_ties(&self, mut i: usize) -> usize {
-        if i == 0  || self.neighbors.len() == 0 {
+        if i == 0  || self.neighbors.is_empty() {
             return 0;
         }
 
@@ -357,7 +355,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
         }
         else if approx_eq!(f64, self.neighbors.last().unwrap().distance, d) {
             // Handle ties.
-            if self.extra_ties.len() == 0 {
+            if self.extra_ties.is_empty() {
                 self.extra_ties_dist = Some(d);
             }
             // Could do this after.
@@ -383,7 +381,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
                 // Either add to ties, or remove all ties.
                 if approx_eq!(f64, last_neigh.distance, removed.distance) {
                     //self.ties.push(removed);
-                    if self.extra_ties.len() == 0 {
+                    if self.extra_ties.is_empty() {
                         self.extra_ties_dist = Some(removed.distance);
                     }
                     else {
@@ -440,8 +438,8 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     pub fn new(test_x: &ArrayView2<f64>, test_y: &ArrayView1<Label>,
                max_n: usize, distance: D, strategy: KNNStrategy)
             -> KNNEstimator<D> {
-        assert_eq!(test_x.rows(), test_y.len());
-        assert!(test_y.len() > 0);
+        assert_eq!(test_x.nrows(), test_y.len());
+        assert!(!test_y.is_empty());
 
         // How we select k given n.
         let k_from_n = knn_strategy(strategy);
@@ -452,7 +450,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         let max_k = k_from_n(max_n);
 
         let neighbors = test_x.outer_iter()
-                              .into_par_iter()
+                              .into_iter()
                               .map(|x| NearestNeighbors::new(&x, max_k, distance))
                               .collect::<Vec<_>>();
         // We initially set all predictions to 0. Therefore, we need to
@@ -467,14 +465,14 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         let error_count = errors.iter().sum();
 
         KNNEstimator {
-            neighbors: neighbors,
-            errors: errors,
+            neighbors,
+            errors,
             predictions: vec![0; test_y.len()],
             labels: test_y.to_vec(),
             current_k: 1,
             k_error_count: error_count,
             n: 0,
-            k_from_n: k_from_n,
+            k_from_n,
         }
     }
 
@@ -483,11 +481,11 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
             test_x: &ArrayView2<f64>, test_y: &ArrayView1<Label>,
             max_n: usize, distance: D, strategy: KNNStrategy)
             -> KNNEstimator<D> {
-        assert_eq!(train_x.cols(), test_x.cols());
-        assert_eq!(train_x.rows(), train_y.len());
-        assert_eq!(test_x.rows(), test_y.len());
-        assert!(train_x.len() > 0);
-        assert!(test_x.len() > 0);
+        assert_eq!(train_x.ncols(), test_x.ncols());
+        assert_eq!(train_x.nrows(), train_y.len());
+        assert_eq!(test_x.nrows(), test_y.len());
+        assert!(!train_x.is_empty());
+        assert!(!test_x.is_empty());
 
         // How we select k given n.
         let k_from_n = knn_strategy(strategy);
@@ -495,7 +493,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         let max_k = k_from_n(max_n);
 
         let neighbors = test_x.outer_iter()
-                            .into_par_iter()
+                            .into_iter()
                             .map(|x| NearestNeighbors::from_data(&x,
                                                            &train_x.view(),
                                                            &train_y.view(),
@@ -520,14 +518,14 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         }
 
         KNNEstimator {
-            neighbors: neighbors,
-            errors: errors,
-            predictions: predictions,
+            neighbors,
+            errors,
+            predictions,
             labels: test_y.to_vec(),
             current_k: k,
             k_error_count: knn_error,
-            n: n,
-            k_from_n: k_from_n,
+            n,
+            k_from_n,
         }
     }
 
@@ -569,7 +567,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
 }
 
 impl<D> BayesEstimator for KNNEstimator<D>
-    where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
+where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     /// Adds a new example to the k-NN estimator's training data.
     ///
     /// This also updates the prediction, if necessary.
@@ -581,59 +579,38 @@ impl<D> BayesEstimator for KNNEstimator<D>
         // We copy because we're using them in the closure below.
         let current_k = self.current_k;
 
-        // We do all this in this gigantic closure so that we can
-        // parallelize it with rayon.
-        let error_updates: Result<Vec<_>, ()> = self.neighbors.par_iter_mut()
-            .zip(&self.labels)
-            .zip(&mut self.predictions)
-            .zip(&mut self.errors)
-            // The closure in the following filter_map() returns an
-            // Option<Result<f64, ()>>, where None is returned if there's
-            // no need to update, Some(Ok(update)) is returned when the
-            // current error needs updating +=update, and Some(Err(()))
-            // is returned when an error occours;
-            // I could not find a better way to catch and return the
-            // errors within iter(), but maybe there's a better way.
-            .filter_map(|(((neigh, true_y), old_pred), old_error)| {
-                if neigh.add_example(x, y) {
-                    if neigh.updated_k > current_k {
-                        return None;
-                    }
-
-                    // Update prediction.
-                    let pred = match neigh.predict(current_k) {
-                        Ok(pred) => pred,
-                        _ => return Some(Err(())),
-                    };
-                    if pred == *old_pred {
-                        return None;
-                    }
-
-                    // Update error.
-                    let error = if pred != *true_y { 1 } else { 0 };
-
-                    *old_pred = pred;
-
-                    let update = match (error, *old_error) {
-                        (1, 0) => 1,
-                        (0, 1) => -1,
-                        // No need to update. Note that we do not need
-                        // to set *old_error = error either, as they're
-                        // also the same. So we can return now.
-                        _ => { return None },
-                    };
-
-                    *old_error = error;
-                    return Some(Ok(update));
+        // Update errors and neighbors as appropriate.
+        for (neigh, true_y, old_pred, old_error) in
+                izip!(&mut self.neighbors, &self.labels,
+                      &mut self.predictions, &mut self.errors) {
+            if neigh.add_example(x, y) {
+                if neigh.updated_k > current_k {
+                    continue;
                 }
-                None
-            })
-            .collect();
 
-        // We sum the updates as i32, as they may be +1/-1.
-        let update = error_updates?.iter().sum::<i32>();
-        assert!(update >= 0);
-        self.k_error_count += update as u32;
+                // Update prediction.
+                let pred = neigh.predict(current_k)?;
+                if pred == *old_pred {
+                    continue;
+                }
+
+                // Update error.
+                let error = if pred != *true_y { 1 } else { 0 };
+
+                *old_pred = pred;
+
+                match (error, *old_error) {
+                    (1, 0) => { self.k_error_count += 1 },
+                    (0, 1) => { self.k_error_count -= 1 },
+                    // No need to update. Note that we do not need
+                    // to set *old_error = error either, as they're
+                    // also the same. So we can return now.
+                    _ => { continue },
+                };
+
+                *old_error = error;
+            }
+        }
 
         Ok(())
     }
@@ -645,7 +622,7 @@ impl<D> BayesEstimator for KNNEstimator<D>
 
     /// Returns the error for the current k.
     fn get_error(&self) -> f64 {
-        self.k_error_count as f64 / self.labels.len() as f64
+        f64::from(self.k_error_count) / (self.labels.len() as f64)
     }
 }
 
@@ -815,7 +792,7 @@ mod tests {
                             [4.],
                             [5.]];
         let test_y = array![0, 0, 2, 1, 0, 1, 0];
-        let max_n = train_x.rows();
+        let max_n = train_x.nrows();
         let distance = euclidean_distance;
 
         // Test for k = 1.
@@ -847,7 +824,7 @@ mod tests {
         }
 
         // Test when changing k.
-        let max_n = train_x.rows();
+        let max_n = train_x.nrows();
         // Custom k_from_n.
         let k_from_n = Box::new(|n| match n {
             0..=3 => 1,

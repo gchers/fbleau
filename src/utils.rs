@@ -1,15 +1,12 @@
 //! Utility routines for loading and storing data into files.
-extern crate csv;
-
 use ndarray::prelude::*;
 use std::error::Error;
 use std::collections::HashMap;
-// FIXME: not sure how to remove "self" from the line below.
-use self::csv::ReaderBuilder;
+use csv::ReaderBuilder;
 use std::str::FromStr;
 use std::f64;
 
-use fbleau::Label;
+use Label;
 
 /// Loads a CSV data file.
 ///
@@ -51,13 +48,77 @@ pub fn load_data<T>(fname: &str)
 
     let inputs_a = if let Some(d) = ncols {
         let n = inputs.len() / d;
-        Array::from_vec(inputs)
+        Array::from(inputs)
               .into_shape((n, d))?
     } else {
         panic!("File has wrong format");
     };
 
-    Ok((inputs_a, Array::from_vec(targets)))
+    Ok((inputs_a, Array::from(targets)))
+}
+
+/// Prepare training and evaluation data.
+///
+/// It makes sure the labels are indexed starting from 0,
+/// and, if required, it scales the features.
+pub fn prepare_data(mut train_x: Array2<f64>, train_y: Array1<Label>,
+                    mut test_x: Array2<f64>, test_y: Array1<Label>,
+                    scale: bool) -> (Array2<f64>, Array1<Label>,
+                                     Array2<f64>, Array1<Label>, usize) {
+    // Remap labels so they are zero-based increasing numbers.
+    let (train_y, mapping) = vectors_to_ids(train_y.view()
+                                            .into_shape((train_y.len(), 1))
+                                            .unwrap(), None);
+    let train_nlabels = mapping.len();
+    // Remap test labels according to the mapping used for training labels.
+    let (test_y, mapping) = vectors_to_ids(test_y.view()
+                                           .into_shape((test_y.len(), 1))
+                                           .unwrap(), Some(mapping));
+    // The test labels should all have appeared in the training data;
+    // the reverse is not necessary. If new labels appear in test_y,
+    // the mapping is extended, so we can assert that didn't happen
+    // as follows.
+    let nlabels = mapping.len();
+    // NOTE (6/11/18): this assertion could be removed with an optional
+    // command line flag; indeed, to my understanding, this won't cause
+    // problems to the estimation. However, for the time being I'll keep
+    // it as it is, which is the "safest" option.
+    assert_eq!(nlabels, train_nlabels,
+               "Test data contains labels unseen in training data.
+                Each test label should appear in the training data;
+                the converse is not necessary");
+
+    // Scale features.
+    if train_x.ncols() > 1 && scale {
+        println!("scaling features");
+        scale01(&mut train_x);
+        scale01(&mut test_x);
+    }
+
+    (train_x, train_y, test_x, test_y, nlabels)
+}
+
+/// Returns true if all the elements of the array
+/// can be converted into integers without loss.
+///
+/// # Examples
+///
+/// ```
+/// # extern crate ndarray;
+/// # extern crate fbleau;
+/// # use ndarray::prelude::*;
+/// # use fbleau::utils::has_integer_support;
+/// assert!(has_integer_support(&array![[3.], [6.], [0.], [-4.]]));
+/// assert!(has_integer_support(&array![3., 6., 0., -4.]));
+/// assert!(!has_integer_support(&array![2., 5.5, 3.]));
+/// ```
+pub fn has_integer_support<D: ndarray::Dimension>(v: &Array<f64, D>) -> bool {
+    for x in v.iter() {
+        if x.fract() != 0. {
+            return false;
+        }
+    }
+    true
 }
 
 /// Represents d-dimensional vector objects into 1-dimentional
@@ -65,7 +126,7 @@ pub fn load_data<T>(fname: &str)
 pub fn vectors_to_ids(objects: ArrayView2<usize>,
         mapping: Option<HashMap<Array1<usize>, usize>>)
         -> (Array1<usize>, HashMap<Array1<usize>, usize>) {
-    let mut out = Vec::with_capacity(objects.rows());
+    let mut out = Vec::with_capacity(objects.nrows());
 
     let mut next_id = 0;
     let mut mapping = if let Some(mapping) = mapping {
@@ -83,15 +144,13 @@ pub fn vectors_to_ids(objects: ArrayView2<usize>,
         out.push(*id);
     }
 
-    println!("mapped vectors into {} unique IDs", next_id);
-
-    (Array::from_vec(out), mapping)
+    (Array::from(out), mapping)
 }
 
 /// Scales columns' values in [0,1] with min-max scaling.
 pub fn scale01(matrix: &mut Array2<f64>) {
-    let mut max = Array::ones(matrix.cols()) * -f64::INFINITY;
-    let mut min = Array::ones(matrix.cols()) * f64::INFINITY;
+    let mut max = Array::ones(matrix.ncols()) * -f64::INFINITY;
+    let mut min = Array::ones(matrix.ncols()) * f64::INFINITY;
 
     for row in matrix.outer_iter() {
         for i in 0..row.len() {
@@ -132,7 +191,6 @@ pub fn estimate_random_guessing(labels: &ArrayView1<usize>) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ndarray::*;
 
     #[test]
     fn test_vectors_to_ids() {

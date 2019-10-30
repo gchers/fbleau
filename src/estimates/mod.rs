@@ -2,19 +2,31 @@
 //! evaluating convergence.
 pub mod knn;
 pub mod knn_utils;
+pub mod nn_bound;
 pub mod frequentist;
 pub mod convergence;
 
 pub use self::knn::KNNEstimator;
+pub use self::nn_bound::NNBoundEstimator;
 pub use self::frequentist::FrequentistEstimator;
 pub use self::convergence::ForwardChecker;
-pub use self::knn_utils::{KNNStrategy,knn_strategy,nn_bound};
+pub use self::knn_utils::*;
 
 use Label;
 use ndarray::prelude::*;
-use strsim::generic_levenshtein;
 
+/// Estimators that F-BLEAU currently provides.
+#[derive(Deserialize)]
+#[serde(rename_all="lowercase")]
+pub enum Estimate {
+    NN,
+    KNN,
+    Frequentist,
+    #[serde(rename="nn-bound")]
+    NNBound,
+}
 
+/// Every estimator should implement this trait.
 pub trait BayesEstimator {
     /// Adds a new training example.
     fn add_example(&mut self, x: &ArrayView1<f64>, y: Label) -> Result<(), ()>;
@@ -29,18 +41,4 @@ fn some_or_error<T>(opt: Option<T>) -> Result<T, ()> {
         Some(x) => Ok(x),
         None => Err(()),
     }
-}
-
-/// Returns the Euclidean distance between two vectors of f64 values.
-pub fn euclidean_distance(v1: &ArrayView1<f64>, v2: &ArrayView1<f64>) -> f64 {
-    v1.iter()
-      .zip(v2.iter())
-      .map(|(x,y)| (x - y).powi(2))
-      .sum::<f64>()
-      .sqrt()
-}
-
-/// Returns the Levenshtein distance between two vectors of f64 values.
-pub fn levenshtein_distance(v1: &ArrayView1<f64>, v2: &ArrayView1<f64>) -> f64 {
-    generic_levenshtein(v1, v2) as f64
 }

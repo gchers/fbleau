@@ -33,83 +33,65 @@
 //!
 //! The general syntax is:
 //!
-//!     fbleau <estimate> [options] <train> <test>
+//!     fbleau <estimate> [--knn-strategy=<strategy>] [options] <train> <eval>
 //!
 //! ## Estimates
 //!
 //! Currently available estimates:
 //!
-//! **log** k-NN estimate, with `k = ln(n)`, where `n` is the number of training
-//! examples.
+//! - nn
+//! - knn
+//! - frequentist
+//! - nn-bound
 //!
-//! **log 10** k-NN estimate, with `k = log10(n)`, where `n` is the number of
-//! training examples.
+//! NOTE: The `frequentist` and `nn` strategies only converge if the
+//! observation space is finite. The `knn` estimator is guaranteed to
+//! converge (given enough data) even if the observation space is continuous.
+//! The `nn-bound` works for both continuous/finite spaces, but it guarantees
+//! to be a lower bound of the Bayes risk.
 //!
-//! **frequentist** (or "lookup table") Standard estimate. Note that this
-//! is only applicable when the outputs are finite; also, it does not scale
-//! well to large systems (e.g., large input/output spaces).
-//!
-//! Bounds and other estimates:
-//!
-//! **nn-bound** Produces a lower bound of R* discovered by Cover and Hard ('67),
-//! which is based on the error of the NN classifier (1-NN).
-//!
-//! **--knn** Runs the k-NN classifier for a fixed k to be specified.
-//! Note that this _does not_ guarantee convergence to the Bayes risk.
-//!
-//! ## Further options
-//!
-//! By default, `fbleau` runs until a convergence criterion is met.
-//! We usually declare convergence if an estimate did not vary more
-//! than `--delta`, either in relative (default) or absolute
-//! (`--absolute`) value, from its value in the last `q` examples
-//! (where `q` is specified with `--qstop`).
-//! One can specify more than one deltas as comma-separated values, e.g.:
-//! `--delta=0.1,0.01,0.001`.
-//!
-//! Optionally, one may choose to let the estimator run for all the training
-//! set (`--run-all`), in which case `fbleau` will still report how many
-//! examples where required for convergence.
-//!
-//! When the system's outputs are vectors, `fbleau` by default does not
-//! scale their values. The option `--scale` allows scaling in 0-1.
+//! The `knn` option must be accompained by a `--knn-strategy` flag, whose
+//! value is in:
+//! - ln
+//! - log10
+//! The choice between the two cannot be done a priori: one should try both,
+//! and see which one produces the smallest estimate.
 extern crate ndarray;
 extern crate docopt;
 #[macro_use]
-extern crate serde_derive;
-extern crate serde_json;
+extern crate serde;
 extern crate itertools;
-extern crate ndarray_parallel;
-
-extern crate fbleau;
 extern crate strsim;
 
-mod utils;
-mod security_measures;
+extern crate fbleau;
 
-use ndarray::*;
-use std::fs::File;
 use docopt::Docopt;
-use std::io::Write;
-use ndarray_parallel::rayon;
 
-use fbleau::Label;
 use fbleau::estimates::*;
-use security_measures::*;
-use utils::{load_data, vectors_to_ids, scale01, estimate_random_guessing};
+use fbleau::security_measures::*;
+use fbleau::fbleau_estimation::run_fbleau;
+use fbleau::utils::load_data;
 
 const USAGE: &str = "
 Estimate k-NN error and convergence.
 
-Usage: fbleau log [options] <train> <test>
-       fbleau log10 [options] <train> <test>
-       fbleau nn-bound [options] <train> <test>
-       fbleau --knn=<k> [options] <train> <test>
-       fbleau frequentist [options] <train> <test>
+Usage: fbleau <estimate> [--knn-strategy=<strategy>] [options] <train> <eval>
        fbleau (--help | --version)
 
+Arguments:
+    estimate:   nn              Nearest Neighbor. Converges only if the
+                                observation space is finite.
+                knn             k-NN rule. Converges for finite/continuous
+                                observation spaces.
+                frequentist     Frequentist estimator. Converges only if the
+                                observation space is finite.
+    knn-strategy: ln            k-NN with k = ln(n).
+                  log10         k-NN with k = log10(n).
+    train                       Training data (.csv file).
+    eval                        Evaluation data (.csv file).
+
 Options:
-    --verbose=<fname>           Logs estimates at each step.
+    --logfile=<fname>           Log estimates at each step.
     --delta=<d>                 Delta for delta covergence.
     --qstop=<q>                 Number of examples to declare
                                 delta-convergence. Default is 10% of
@@ -119,9 +101,7 @@ Options:
     --scale                     Scale features before running k-NN
                                 (only makes sense for objects of 2 or more
                                 dimensions).
-    --nprocs=<n>                Number of threads to spawn. By default it is
-                                the number of available CPUs.
-    --distance=<name>           Distance metric (e.g, \"euclidean\" or
+    --distance=<name>           Distance metric in (\"euclidean\",
                                 \"levenshtein\").
     -h, --help                  Show help.
     --version                   Show the version.
@@ -129,206 +109,40 @@ Options:
 
 #[derive(Deserialize)]
 struct Args {
-    cmd_log: bool,
-    cmd_log10: bool,
-    cmd_nn_bound: bool,
-    cmd_frequentist: bool,
-    flag_knn: Option<usize>,
-    flag_verbose: Option<String>,
+    arg_estimate: Estimate,
+    flag_knn_strategy: Option<KNNStrategy>,
+    flag_logfile: Option<String>,
     flag_delta: Option<f64>,
     flag_qstop: Option<usize>,
     flag_absolute: bool,
     flag_scale: bool,
-    flag_nprocs: Option<usize>,
     flag_distance: Option<String>,
     arg_train: String,
-    arg_test: String,
-}
-
-
-/// Prints several security measures that can be derived from a Bayes risk
-/// estimate and Random guessing error.
-fn print_all_measures(bayes_risk_estimate: f64, random_guessing: f64) {
-    println!("Multiplicative Leakage: {}",
-             multiplicative_leakage(bayes_risk_estimate, random_guessing));
-    println!("Additive Leakage: {}",
-             additive_leakage(bayes_risk_estimate, random_guessing));
-    println!("Bayes security measure: {}",
-             bayes_security_measure(bayes_risk_estimate, random_guessing));
-    println!("Min-entropy Leakage: {}",
-             min_entropy_leakage(bayes_risk_estimate, random_guessing));
-}
-
-/// Estimates security measures with a forward strategy (i.e., with an
-/// increasing number of examples).
-fn run_forward_strategy<E>(mut estimator: E, compute_nn_bound: bool,
-                        nlabels: usize,
-                        mut convergence_checker: Option<ForwardChecker>,
-                        verbose: Option<String>, train_x: Array2<f64>,
-                        train_y: Array1<Label>) -> (f64, f64)
-                        where E: BayesEstimator {
-    // Init verbose log file.
-    let mut logfile = if let Some(fname) = verbose {
-        let mut logfile = File::create(&fname)
-                               .expect("couldn't open file for verbose logging");
-        writeln!(logfile, "n, error-count, estimate")
-            .expect("failed to write to verbose file");
-        Some(logfile)
-    } else {
-        None
-    };
-
-    // We keep track both of the minimum and of the last estimate.
-    let mut min_error = 1.0;
-    let mut last_error = 1.0;
-
-    for (n, (x, y)) in train_x.outer_iter().zip(train_y.iter()).enumerate() {
-        // Compute error.
-        estimator.add_example(&x, *y)
-                 .expect("Could not add more examples.");
-        last_error = estimator.get_error();
-
-        // Compute NN bound by Cover and Hart if needed.
-        if compute_nn_bound {
-            last_error = nn_bound(last_error, nlabels);
-        }
-
-        if min_error > last_error {
-            min_error = last_error;
-        }
-
-        if let Some(ref mut logfile) = logfile {
-            writeln!(logfile, "{}, {}, {}", n, estimator.get_error_count(),
-                     last_error).expect("failed to write to verbose file");
-        }
-
-        // Should we stop because of (delta, q)-convergence?
-        if let Some(ref mut checker) = convergence_checker {
-            checker.add_estimate(last_error);
-            if checker.all_converged() {
-                break;
-            }
-        }
-    }
-
-    (min_error, last_error)
+    arg_eval: String,
 }
 
 
 fn main() {
     // Parse args from command line.
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.version(Some(env!("CARGO_PKG_VERSION").to_string()))
+                            .and_then(|d| d.version(Some(env!("CARGO_PKG_VERSION")
+                                                            .to_string()))
                                            .deserialize())
                             .unwrap_or_else(|e| e.exit());
 
-    // Number of processes.
-    if let Some(nprocs) = args.flag_nprocs {
-        rayon::ThreadPoolBuilder::new()
-                                 .num_threads(nprocs)
-                                 .build_global()
-                                 .unwrap();
-    }
-
     // Load data.
-    let (mut train_x, train_y) = load_data::<f64>(&args.arg_train)
+    let (train_x, train_y) = load_data::<f64>(&args.arg_train)
                                 .expect("[!] failed to load training data");
-    let (mut test_x, test_y) = load_data::<f64>(&args.arg_test)
-                                .expect("[!] failed to load test data");
+    let (eval_x, eval_y) = load_data::<f64>(&args.arg_eval)
+                                .expect("[!] failed to load evaluation data");
 
-    // Remap labels so they are zero-based increasing numbers.
-    let (train_y, mapping) = vectors_to_ids(train_y.view()
-                                            .into_shape((train_y.len(), 1))
-                                            .unwrap(), None);
-    let train_nlabels = mapping.len();
-    // Remap test labels according to the mapping used for training labels.
-    let (test_y, mapping) = vectors_to_ids(test_y.view()
-                                           .into_shape((test_y.len(), 1))
-                                           .unwrap(), Some(mapping));
-    // The test labels should all have appeared in the training data;
-    // the reverse is not necessary. If new labels appear in test_y,
-    // the mapping is extended, so we can assert that didn't happen
-    // as follows.
-    let nlabels = mapping.len();
-    // NOTE (6/11/18): this assertion could be removed with an optional
-    // command line flag; indeed, to my understanding, this won't cause
-    // problems to the estimation. However, for the time being I'll keep
-    // it as it is, which is the "safest" option.
-    assert_eq!(nlabels, train_nlabels,
-               "Test data contains labels unseen in training data.
-                Each test label should appear in the training data;
-                the converse is not necessary");
-
-    // (delta, q)-convergence checker
-    let convergence_checker = if args.flag_delta.is_none() && args.flag_qstop.is_none() {
-        // By default, run all (i.e., don't stop for (delta, q)-convergence.
-        None
-    } else if let Some(delta) = args.flag_delta {
-        let q = match args.flag_qstop {
-            Some(q) => if q < train_x.len() { q } else { train_x.len()-1 },
-            None => (train_x.len() as f64 * 0.1) as usize,
-        };
-        println!("will stop when (delta={}, q={})-converged", delta, q);
-        Some(ForwardChecker::new(&vec![delta], q, !args.flag_absolute))
-    } else {
-        panic!("--qstop should only be specified with --delta");
-    };
-
-    // Scale features.
-    if train_x.cols() > 1 && args.flag_scale {
-        println!("scaling features");
-        scale01(&mut train_x);
-        scale01(&mut test_x);
-    }
-
-    let random_guessing = estimate_random_guessing(&test_y.view());
-    println!("Random guessing error: {}", random_guessing);
-    println!("Estimating leakage measures...");
-
-    // Init estimator and run.
-    let (min_error, last_error) = if args.cmd_frequentist {
-        let estimator = FrequentistEstimator::new(nlabels,
-                                                  &test_x.view(),
-                                                  &test_y.view());
-        run_forward_strategy(estimator, args.cmd_nn_bound, nlabels,
-                             convergence_checker, args.flag_verbose, train_x,
-                             train_y)
-    } else {
-        // Distance for k-NN.
-        let distance = match args.flag_distance.as_ref().map(String::as_ref) {
-            Some("euclidean") => fbleau::estimates::euclidean_distance,
-            Some("levenshtein") => fbleau::estimates::levenshtein_distance,
-            _ => fbleau::estimates::euclidean_distance
-        };
-        // How k is computed w.r.t. n.
-        let k_from_n = if args.cmd_nn_bound {
-            KNNStrategy::NN
-        } else if let Some(k) = args.flag_knn {
-            KNNStrategy::FixedK(k)
-        } else if args.cmd_log {
-            KNNStrategy::Ln
-        } else if args.cmd_log10 {
-            KNNStrategy::Log10
-        } else {
-            panic!("Issue in parsing command.");
-        };
-
-        // Maximum value that n will take.
-        let max_n = train_x.rows();
-
-        let estimator = KNNEstimator::new(&test_x.view(), &test_y.view(),
-                                          max_n, distance, k_from_n);
-        run_forward_strategy(estimator, args.cmd_nn_bound, nlabels,
-                             convergence_checker, args.flag_verbose, train_x,
-                             train_y)
-    };
-
+    let (min_error, _, random_guessing) = 
+        run_fbleau(train_x, train_y, eval_x, eval_y, args.arg_estimate,
+                   args.flag_knn_strategy, args.flag_distance, args.flag_logfile,
+                   args.flag_delta, args.flag_qstop, args.flag_absolute,
+                   args.flag_scale);
 
     println!();
-    println!("Final estimate: {}", last_error);
-    print_all_measures(last_error, random_guessing);
-    println!();
-
     println!("Minimum estimate: {}", min_error);
     print_all_measures(min_error, random_guessing);
 }
