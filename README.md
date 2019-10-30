@@ -208,6 +208,11 @@ absolute : measure absolute instead of relative convergence
 scale : scale observations' features in [0,1]
 ```
 
+The function `run_fbleau()` returns three values:
+- the minimum Bayes risk estimate (should be used)
+- the estimate computed with the full training data
+- an estimate of the random guessing error (~baseline, see [2])
+
 Simple example:
 ```python
 fbleau.run_fbleau(train_x, train_y, test_x, test_y, estimate='knn',
