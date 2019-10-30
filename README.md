@@ -17,7 +17,10 @@ exponentiation.
 
 # Getting started
 
-F-BLEAU takes as input CSV data containing examples of system's inputs
+F-BLEAU is provided as a command line tool, `fbleau`.
+Python bindings also exist (see below).
+
+`fbleau` takes as input CSV data containing examples of system's inputs
 and outputs.
 It currently requires two CSV files as input: a _training_ file and a
 _validation_ (or _test_) file, such as:
@@ -152,8 +155,7 @@ fbleau -h
 
 The code is written in `Rust`, but it is thought to be used as a
 standalone command line tool.
-Bindings to other programming languages (e.g., Python) may happen in the
-future.
+
 
 Install [rustup](https://rustup.rs), which will make `cargo` available
 on your path.
@@ -172,7 +174,49 @@ package manager, and then install `fbleau` as above.
 If this doesn't work, please open a ticket.
 
 
-## TODO
+# Python bindings
+
+If you prefer using F-BLEAU via Python, we now provide
+basic functionalities via a Python module.
+
+To install:
+```console
+pip install fbleau
+```
+
+Usage:
+```console
+>>> import fbleau
+>>> fbleau.run_fbleau(train_x, train_y, test_x, test_y, estimate,
+... knn_strategy, distance, logfile, delta, qstop, absolute, scale)
+```
+
+Where the parameters follow the above conventions.
+
+```
+train_x : training observations (2d numpy array)
+train_y : training secrets (1d numpy array)
+test_x : test observations (2d numpy array)
+test_y : test secrets (1d numpy array)
+estimate : estimate, value in ("nn", "knn", "frequentist", "nn-bound")
+knn_strategy : if estimate is "knn", specify one in ("ln", "log10")
+distance : the distance used for NN or k-NN
+logfile : if specified, log the estimate values at every step in this file
+delta : use to stop fbleau when it reaches (delta, qstop)-convergence
+qstop : use to stop fbleau when it reaches (delta, qstop)-convergence
+absolute : measure absolute instead of relative convergence
+scale : scale observations' features in [0,1]
+```
+
+Simple example:
+```python
+fbleau.run_fbleau(train_x, train_y, test_x, test_y, estimate='knn',
+                  knn_strategy='ln', distance='euclidean', logfile=None,
+                  delta=None, qstop=None, absolute=false, scale=false)
+```
+
+
+# TODO
 
 Currently, the code provided here:
 - is based on frequentist and nearest neighbor methods; in the future we hope
@@ -194,7 +238,7 @@ Currently, the code provided here:
 ### Maybe
 
 - [ ] other ML methods (e.g., SVM, neural network)
-- [ ] Python bindings
+- [x] Python bindings
 
 
 # References
