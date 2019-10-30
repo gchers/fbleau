@@ -215,13 +215,12 @@ fbleau.run_fbleau(train_x, train_y, test_x, test_y, estimate='knn',
                   delta=None, qstop=None, absolute=false, scale=false)
 ```
 
-
 # TODO
 
 Currently, the code provided here:
 - is based on frequentist and nearest neighbor methods; in the future we hope
   to extend this to other ML methods; note that this does not affect the
-  generality of the results, which hold against any classifier,
+  generality of the results, which hold for any "universally consistent" classifier,
 - computes one estimate at the time (i.e., to compute multiple estimates one
   needs to run `fbleau` several times); this can change in the future.
 
@@ -239,6 +238,24 @@ Currently, the code provided here:
 
 - [ ] other ML methods (e.g., SVM, neural network)
 - [x] Python bindings
+
+
+# Hacking
+
+If you want to play with this code, you can compile it (after
+cloning the repo) with:
+
+```
+cargo build
+```
+
+To compile the Python module, you need to enable the optional
+feature `python-module`; this requires nightly Rust.
+Install maturin (`pip install maturin`), and then compile with:
+
+```
+maturin build --cargo-extra-args="--features python-module"
+```
 
 
 # References
