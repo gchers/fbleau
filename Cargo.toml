@@ -12,10 +12,15 @@ exclude = [
 [lib]
 name = "fbleau"
 path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
 
 [[bin]]
 name = "fbleau"
 path = "src/main.rs"
+
+[features]
+# If enabled, it produces a Python module.
+python-module = ["pyo3", "numpy"]
 
 [dependencies]
 docopt = "1"
@@ -26,6 +31,8 @@ ordered-float = "0.5.0"
 float-cmp = "0.5.2"
 strsim = "0.9.1"
 ndarray = "0.13.0"
+pyo3 = { version = "0.8.2", features = ["extension-module"], optional = true }
+numpy = { version = "0.7.0", optional = true }
 
 [dev-dependencies]
 rustlearn = "0.5.0"
