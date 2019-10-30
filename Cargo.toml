@@ -1,6 +1,6 @@
 [package]
 name = "fbleau"
-version = "0.2.2"
+version = "0.3.0"
 license = "MIT"
 authors = ["Giovanni Cherubin <g.chers@gmail.com>"]
 description = "A tool for measuring black-box security via Machine Learning"
