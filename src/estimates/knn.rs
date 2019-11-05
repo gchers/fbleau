@@ -387,8 +387,8 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
                     else {
                         // TODO: could remove this check if we're sure it is
                         // updated elsewhere correctly.
-                        let dist = removed.distance.expect("Logic error. Open a PR if this happens");
-                        assert!(approx_eq!(f64, dist, self.extra_ties_dist));
+                        let dist = self.extra_ties_dist.expect("Logic error. Open a PR if this happens");
+                        assert!(approx_eq!(f64, removed.distance, dist));
                     }
                     let count = self.extra_ties.entry(removed.label).or_insert(0);
                     *count += 1;
