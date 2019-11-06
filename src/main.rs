@@ -92,6 +92,8 @@ Arguments:
 
 Options:
     --logfile=<fname>           Log estimates at each step.
+    --logerrors=<fname>         Log the error for each test object at every
+                                step.
     --delta=<d>                 Delta for delta covergence.
     --qstop=<q>                 Number of examples to declare
                                 delta-convergence. Default is 10% of
@@ -112,6 +114,7 @@ struct Args {
     arg_estimate: Estimate,
     flag_knn_strategy: Option<KNNStrategy>,
     flag_logfile: Option<String>,
+    flag_logerrors: Option<String>,
     flag_delta: Option<f64>,
     flag_qstop: Option<usize>,
     flag_absolute: bool,

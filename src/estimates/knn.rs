@@ -387,8 +387,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
                     else {
                         // TODO: could remove this check if we're sure it is
                         // updated elsewhere correctly.
-                        let dist = removed.distance.expect("Logic error. Open a PR if this happens");
-                        assert!(approx_eq!(f64, dist, self.extra_ties_dist));
+                        assert_eq!(Some(removed.distance), self.extra_ties_dist);
                     }
                     let count = self.extra_ties.entry(removed.label).or_insert(0);
                     *count += 1;
@@ -622,6 +621,11 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     /// Returns the error for the current k.
     fn get_error(&self) -> f64 {
         f64::from(self.k_error_count) / (self.labels.len() as f64)
+    }
+
+    /// Returns the current errors for each test point.
+    fn get_errors(&self) -> Vec<u32> {
+        self.errors.clone()
     }
 }
 

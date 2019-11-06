@@ -355,6 +355,17 @@ impl BayesEstimator for FrequentistEstimator {
     fn get_error(&self) -> f64 {
         (self.error_count as f64) / (self.test_y.len() as f64)
     }
+
+    /// Returns the current errors for each test point.
+    fn get_errors(&self) -> Vec<usize> {
+        let errors = Vec::with_capacity(self.test_x.nrows());
+
+        for (xi, &yi) in self.test_x.iter().zip(&self.test_y) {
+            if let Some(joint) = self.joint_count.get(&x) {
+                let pred = joint.predict();
+                if pred == yi {
+                    errors.push(
+    }
 }
 
 /// Maps an object (feature vector of float numbers) into an index.
