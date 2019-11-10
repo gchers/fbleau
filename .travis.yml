@@ -18,7 +18,7 @@ jobs:
 after_success:
     - |
         # Only build&publish for nightly, on master, for tagged releases.
-        if ([ "$TRAVIS_BRANCH" == "master" ] || [ ! -z "$TRAVIS_TAG" ]) && 
+        if [ "$TRAVIS_BRANCH" == "master" ] && [ ! -z "$TRAVIS_TAG" ] &&
                 [ "$TRAVIS_PULL_REQUEST" == "false" ] &&
                 [ "$TRAVIS_RUST_VERSION" = "nightly" ]; then
             # Set up Windows
