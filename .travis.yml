@@ -1,15 +1,40 @@
 language: rust
+
 rust:
     - stable
-    - beta
     - nightly
-
-matrix:
-    allow_failures:
-        - rust: nightly
-    fast_finish: true
 
 os:
     - linux
     - osx
     - windows
+
+jobs:
+    allow_failures:
+    - rust: nightly
+    fast_finish: true
+
+# Build and publish Python module with maturin.
+after_success:
+    - |
+        # Only build&publish for nightly, on master, for tagged releases.
+        if ([ "$TRAVIS_BRANCH" == "master" ] || [ ! -z "$TRAVIS_TAG" ]) && 
+                [ "$TRAVIS_PULL_REQUEST" == "false" ] &&
+                [ "$TRAVIS_RUST_VERSION" = "nightly" ]; then
+            # Set up Windows
+            if [ "$TRAVIS_OS_NAME" = "windows" ]; then
+                choco install python3
+                export PATH="/c/Python38:/c/Python38/Scripts:$PATH"
+                pip install maturin
+            else
+                # Linux and OSX
+                export PATH=$PATH:$(python -m site --user-base)/bin
+                pip install --user maturin
+            fi
+            # Get maturin and publish module.
+            maturin publish -u gchers --cargo-extra-args="--features python-module"
+        fi
+
+env:
+  global:
+  - secure: HBARSAjHohnpduy4yWyKawZa54sOl9iqxINub3V2Qnr5/9R1G/vumG0peQwtYvOkeIAZobesuLG4XGWmjsUgDC5J733KXlZGoz2D6LLILUAvZhP1eXOHdfHb4suda8cE/OQqpPtZCDnraX2Uf8yxXng8d3h0Zs38ALuEegyyTpXXorW7H/ws49K9gh31iVL/hbmfevKuij5ODTG8a83kXK8n30z6h9zby1K3os/1b/CgS9RXCZm/fVN4m/Am0lMp6zE7fR50gBi7nSvPzDIZnUyzAnHg7zZnu51z3hQ1Q+LP35Mpzsd9kH/lkNp73LdmS7/J+LkPNDm1FMrRg8d17c0wcrtBAFeWg/wsx71p95jDUGAdUleomVZY8+8JV4kGA1vXBhfcD5NayDGDcAGX5abzMKb0IWjPbG4tSKOyDPr8SJ7AA6vE9bkqIFfd3leblr1RqdFNQUGMfWKayh0HGNYCprXptORoB9Cs7InZhEID9Psxd8pVsXYEiWQK9/qzg4+TWBEk5gfXVlUEtyvdnrLOZwfUTilhxqE84JmdiKrD1I7zXh1O35ReX6YLlKZmQY0cU8XRWVKN//MqV/mPtuis9HtahAxVe/KBFSiXMaippGUzqK1xJwkoJPf+/RvQndZnpPWnaRRdvi220wo57cDf2ObWgOyjsaOGsgSaLjI=
