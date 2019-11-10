@@ -51,5 +51,10 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         let error = self.knn.get_error();
         nn_bound(error, self.nlabels)
     }
+
+    /// Returns the current errors for each test point.
+    fn get_individual_errors(&self) -> Vec<bool> {
+        self.knn.get_individual_errors()
+    }
 }
 

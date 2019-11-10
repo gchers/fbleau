@@ -624,8 +624,14 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     }
 
     /// Returns the current errors for each test point.
-    fn get_errors(&self) -> Vec<u32> {
-        self.errors.clone()
+    fn get_individual_errors(&self) -> Vec<bool> {
+        self.errors.iter()
+                   .map(|e| match e {
+                            0 => false,
+                            1 => true,
+                            _ => panic!("errors must contain values in {0,1}")
+                            })
+                   .collect::<Vec<_>>()
     }
 }
 

@@ -357,14 +357,23 @@ impl BayesEstimator for FrequentistEstimator {
     }
 
     /// Returns the current errors for each test point.
-    fn get_errors(&self) -> Vec<usize> {
-        let errors = Vec::with_capacity(self.test_x.nrows());
+    fn get_individual_errors(&self) -> Vec<bool> {
+        let mut errors = Vec::with_capacity(self.test_x.len());
 
         for (xi, &yi) in self.test_x.iter().zip(&self.test_y) {
-            if let Some(joint) = self.joint_count.get(&x) {
-                let pred = joint.predict();
-                if pred == yi {
-                    errors.push(
+            let pred = if let Some(joint) = self.joint_count.get(&xi) {
+                joint.predict().unwrap()
+            }
+            else {
+                match self.priors_count.predict() {
+                    Some(pred) => pred,
+                    None => panic!("Call get_individual_errors() after training"),
+                }
+            };
+
+            errors.push(pred == yi);
+        }
+        errors
     }
 }
 
