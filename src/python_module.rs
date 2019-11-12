@@ -32,7 +32,7 @@ fn pyfbleau(_py: Python, m: &PyModule) -> PyResult<()> {
     /// distance : the distance used for NN or k-NN
     /// log_errors : if `true`, also return the estimate's value (error)
     ///              for each step
-    /// individual_log_errors : if `true`, log the individual errors for each
+    /// log_individual_errors : if `true`, log the individual errors for each
     ///                         test object, for the best estimator
     ///                         (i.e., for the smallest error estimate)
     /// delta : use to stop fbleau when it reaches (delta, qstop)-convergence
