@@ -7,6 +7,7 @@ extern crate rustlearn;
 extern crate fbleau;
 
 use fbleau::*;
+use fbleau::estimates::*;
 use fbleau::estimates::knn::KNNEstimator;
 use bencher::Bencher;
 use ndarray::prelude::*;
@@ -77,22 +78,23 @@ fn load_iris() -> (Array2<f64>, Array1<Label>, Array2<f64>, Array1<Label>) {
 fn bench_knn_init(b: &mut Bencher) {
 
     let (train_x, train_y, test_x, test_y) = load_boston();
-    let max_k = train_x.rows();
+    let max_n = train_x.nrows();
 
     b.iter(|| {
         let _knn = KNNEstimator::from_data(&train_x.view(), &train_y.view(),
-                                &test_x.view(), &test_y.view(), max_k, max_k);
+                                &test_x.view(), &test_y.view(), max_n,
+                                euclidean_distance, KNNStrategy::Ln);
     })
 }
         
 fn bench_knn_forward(b: &mut Bencher) {
     let (train_x, train_y, test_x, test_y) = load_boston();
-    let n_train = train_x.rows();
-
-    let max_k = (n_train as f64).ln().ceil() as usize;
+    let n_train = train_x.nrows();
 
     b.iter(|| {
-        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(), 1, max_k);
+        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(),
+                                        n_train, euclidean_distance,
+                                        KNNStrategy::Ln);
         for (n, (x, y)) in train_x.outer_iter().zip(train_y.iter()).enumerate() {
             let k = if n != 0 {
                 let k = (n as f64).ln().ceil() as usize;
