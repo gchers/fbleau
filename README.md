@@ -201,23 +201,32 @@ test_y : test secrets (1d numpy array)
 estimate : estimate, value in ("nn", "knn", "frequentist", "nn-bound")
 knn_strategy : if estimate is "knn", specify one in ("ln", "log10")
 distance : the distance used for NN or k-NN
-logfile : if specified, log the estimate values at every step in this file
+log_errors : if `true`, also return the estimate's value (error)
+             for each step
+log_individual_errors : if `true`, log the individual errors for each
+                        test object, for the best estimator
+                        (i.e., for the smallest error estimate)
 delta : use to stop fbleau when it reaches (delta, qstop)-convergence
 qstop : use to stop fbleau when it reaches (delta, qstop)-convergence
 absolute : measure absolute instead of relative convergence
 scale : scale observations' features in [0,1]
 ```
 
-The function `run_fbleau()` returns three values:
-- the minimum Bayes risk estimate (should be used)
-- the estimate computed with the full training data
-- an estimate of the random guessing error (~baseline, see [2])
+The function `run_fbleau()` returns a dictionary, containing:
+- *min-estimate*: the minimum Bayes risk estimate (should be the one used)
+- *last-estimate*: the estimate computed with the full training data
+- *random-guessing*: an estimate of the random guessing error (~baseline, see [2])
+- *estimates*: (if `log_errors=true`) a vector containing the value of the estimate at every step
+- *min-individual-errors*: (if `log_individual_errors=true`) a vector containing
+  the individual errors (`true` if error, `false` otherwise) for each test object, corresponding to
+  the best (i.e., smallest) estimate
 
 Simple example:
 ```python
 fbleau.run_fbleau(train_x, train_y, test_x, test_y, estimate='knn',
-                  knn_strategy='ln', distance='euclidean', logfile=None,
-                  delta=None, qstop=None, absolute=false, scale=false)
+                  knn_strategy='ln', distance='euclidean', log_errors=false,
+                  log_individual_errors=false, delta=None, qstop=None,
+                  absolute=false, scale=false)
 ```
 
 # TODO
