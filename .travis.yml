@@ -1,40 +1,35 @@
 language: rust
 rust:
-    - stable
-    - nightly
-
+- stable
+- nightly
 os:
-    - linux
-    - osx
-    - windows
-
+- linux
+- osx
+- windows
 jobs:
-    allow_failures:
-        - rust: nightly
-    fast_finish: true
-
-# Build and publish Python module with maturin.
+  allow_failures:
+  - rust: nightly
+  fast_finish: true
 after_success:
-    - |
-        # Only build&publish for nightly, on master, for tagged releases.
-        if [ "$TRAVIS_BRANCH" == "master" ] &&
-                #[ ! -z "$TRAVIS_TAG" ] &&
-                [ "$TRAVIS_PULL_REQUEST" == "false" ] &&
-                [ "$TRAVIS_RUST_VERSION" = "nightly" ]; then
-            # Set up Windows
-            if [ "$TRAVIS_OS_NAME" = "windows" ]; then
-                choco install python3
-                export PATH="/c/Python38:/c/Python38/Scripts:$PATH"
-                pip install maturin
-            else
-                # Linux and OSX
-                export PATH=$PATH:$(python -m site --user-base)/bin
-                pip install --user maturin
-            fi
-            # Get maturin and publish module.
-            maturin publish -u "__token__" --cargo-extra-args="--features python-module"
-        fi
-
+- |
+  # Only build&publish for nightly, on master, for tagged releases.
+  if [ "$TRAVIS_BRANCH" == "master" ] &&
+          #[ ! -z "$TRAVIS_TAG" ] &&
+          [ "$TRAVIS_PULL_REQUEST" == "false" ] &&
+          [ "$TRAVIS_RUST_VERSION" = "nightly" ]; then
+      # Set up Windows
+      if [ "$TRAVIS_OS_NAME" = "windows" ]; then
+          choco install python3
+          export PATH="/c/Python38:/c/Python38/Scripts:$PATH"
+          pip install maturin
+      else
+          # Linux and OSX
+          export PATH=$PATH:$(python -m site --user-base)/bin
+          pip install --user maturin
+      fi
+      # Get maturin and publish module.
+      maturin publish -u "__token__" --cargo-extra-args="--features python-module"
+  fi
 env:
   global:
-  - secure: TkjA6HfbcyeympiUxWEP8Ofn7+zzX6GoUgNPBQQ0Cye7Spyk1lfGpy4MRzKATsBV0v5JZBR6yyyVARTnJ0EbvXPSxWmjHrvkoxfQ/M5N/ku8YgiXlMONViNvvkwDE8Juz3508H28an+UDE9jU4QTGLgQm97WqIrtwO2HaPvR2ucMQ7IIhwJPPXK84scofZoywEpmLtpRExUzqLgG3rBHbo00nBSBjNFj6MxNz4OTSNBVsXqW5Dvb6NMAIAvBoQa5eeqIdNTcMRrjUGkKZ/d6K0y5jQHtQeVE2OdULW/t5CUkz1TcP0v3N3avEx1pn4NdotXshzTraQ6GMHaPFDrse8KveP1EW6uV37k29HE4LECzUh7rRizSLveR7/h3F1LxPjyk6svhzS3PMTLunXwBzCwFhxPlq+3Kw3n/+MijqREXXOJGrye7BrbyUBK6rLpa/zhrIYtatEemMsOEPgIQhQJYET5SE7A58B5pT+jh43y1V3MGCyJqT7TaNUeC+0wxERNYcrFhiF/Ehx69FG7t0ZdSlhgN4n/lO87Qq57KsB7m2u9j3tzErsESg3yP3qCZPVimVpgUr1z9h32mcrkZbHbxsrtZQbc1ip1SR4UlFnQpuOPbrls4R4VMtIi8zIzVzmG/DOJyOcUQAt5qtmlfWsR8lVgk6E+Y/P+j3dINS9I=
+  - secure: FVHfVYPLQvtuj2VExoY969RGrfWP0xawt0IPlO4rrkpnfSEBsJrMJjIQ905RbeSOdmdfzTs+l9CyfELmh1NFIC/aCcDU1aIdYsHUcT0m+3j1ldnwquM3rfbpeY1VDNDnZvDZqq7ticir9smxa4B3TkY3/6JRWm0bNe1uWSWB4KJRUye+cyd6UHVJz4dS3GuVIpYfKOG/Sqqv2uJe5SRt+5k8j3tGbDA7AVN71UL0lNh8NNeZc8FIuOe7E0YTiqbSdsNN/1CvzcvOUX70CutLM4vg3OAW1XAilTJcDChbOkR+P/b+THyBNgELHP7rEe5K1e8ofELn65l9A37ZDqqQB6q1sDG8vrbkaFtFwdBpoKVoKBUqhH6OKX/fgJD2MQlPiFvnF1wlteiYPBNKeoI3q+53xKkbQe1d+jvJQYhMbwvj3uBrCMz/ncRIImP7xkKwBmJJz+Tu7sLuH8S9CBmHes8hjq1Q/oaqn3+dyZO/ewWcS0zUeU5QacLe28S4gseFEcsZYUK28t8eelFwgS7+nSejLeyZIGN9ahrz85eurlrNnJA7VNojafY5iqiVj+nADGOgR07lBjl+4a8BTXMwPUTPhTAwaIjrQ5n5sqvoR0kct/xgMnf0apT9XkcY3aa+OS7q4CEr1yfy2pcr17PK6BWwrLsu1Gx7f6DNdc91fm8=
