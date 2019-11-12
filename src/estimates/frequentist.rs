@@ -355,6 +355,26 @@ impl BayesEstimator for FrequentistEstimator {
     fn get_error(&self) -> f64 {
         (self.error_count as f64) / (self.test_y.len() as f64)
     }
+
+    /// Returns the current errors for each test point.
+    fn get_individual_errors(&self) -> Vec<bool> {
+        let mut errors = Vec::with_capacity(self.test_x.len());
+
+        for (xi, &yi) in self.test_x.iter().zip(&self.test_y) {
+            let pred = if let Some(joint) = self.joint_count.get(&xi) {
+                joint.predict().unwrap()
+            }
+            else {
+                match self.priors_count.predict() {
+                    Some(pred) => pred,
+                    None => panic!("Call get_individual_errors() after training"),
+                }
+            };
+
+            errors.push(pred == yi);
+        }
+        errors
+    }
 }
 
 /// Maps an object (feature vector of float numbers) into an index.
@@ -378,9 +398,8 @@ impl ArrayToIndex {
 
         let mapping = &mut self.mapping;
         let next_id = &mut self.next_id;
-        let id = mapping.entry(x.to_owned())
-                             .or_insert_with(|| { *next_id += 1;
-                                                  *next_id - 1});
+        let id = mapping.entry(x).or_insert_with(|| { *next_id += 1;
+                                                      *next_id - 1});
         *id
     }
 }

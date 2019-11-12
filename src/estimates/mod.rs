@@ -34,6 +34,9 @@ pub trait BayesEstimator {
     fn get_error_count(&self) -> usize;
     /// Returns the current error rate.
     fn get_error(&self) -> f64;
+    /// Returns the current errors for each test point.
+    /// `true` means error, `false` no error.
+    fn get_individual_errors(&self) -> Vec<bool>;
 }
 
 fn some_or_error<T>(opt: Option<T>) -> Result<T, ()> {
