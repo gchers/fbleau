@@ -32,7 +32,7 @@ after_success:
                 pip install --user maturin
             fi
             # Get maturin and publish module.
-            maturin publish -u fbleau --cargo-extra-args="--features python-module"
+            maturin publish -u "__token__" --cargo-extra-args="--features python-module"
         fi
 
 env:
