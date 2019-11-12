@@ -398,9 +398,8 @@ impl ArrayToIndex {
 
         let mapping = &mut self.mapping;
         let next_id = &mut self.next_id;
-        let id = mapping.entry(x.to_owned())
-                             .or_insert_with(|| { *next_id += 1;
-                                                  *next_id - 1});
+        let id = mapping.entry(x).or_insert_with(|| { *next_id += 1;
+                                                      *next_id - 1});
         *id
     }
 }
