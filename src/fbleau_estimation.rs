@@ -169,9 +169,9 @@ where E: BayesEstimator {
     // Log individual test errors.
     if let Some(logger) = individual_error_logger {
         match logger {
-            Logger::LogFile(file) => {
-                writeln!(file, "{:?}", min_individual_errors);
-            },
+            Logger::LogFile(file) =>
+                writeln!(file, "{:?}", min_individual_errors)
+                    .expect("Could not write to log file"),
             Logger::LogVec(v) => v.extend(min_individual_errors.iter()
                                                                .cloned()),
         }
