@@ -17,10 +17,20 @@ use estimates::*;
 use utils::{prepare_data, estimate_random_guessing,has_integer_support};
 
 
+/// Log data either to a .csv file or into a Vec.
+pub enum Logger<T> {
+    LogFile(File),
+    LogVec(Vec<T>),
+}
+
+/// Prepares everything for running F-BLEAU, and runs a forward
+/// estimation strategy.
 pub fn run_fbleau(train_x: Array2<f64>, train_y: Array1<Label>,
                   test_x: Array2<f64>, test_y: Array1<Label>,
                   estimate: Estimate, knn_strategy: Option<KNNStrategy>,
-                  distance: Option<String>, logfile: Option<String>,
+                  distance: Option<String>,
+                  error_logger: &mut Option<Logger<f64>>,
+                  individual_error_logger: &mut Option<Logger<bool>>,
                   delta: Option<f64>, qstop: Option<usize>, absolute: bool,
                   scale: bool)
         -> (f64, f64, f64) {
@@ -65,8 +75,8 @@ pub fn run_fbleau(train_x: Array2<f64>, train_y: Array1<Label>,
             let estimator = FrequentistEstimator::new(nlabels,
                                                       &test_x.view(),
                                                       &test_y.view());
-            run_forward_strategy(estimator, convergence_checker, logfile,
-                                 train_x, train_y)
+            run_forward_strategy(estimator, convergence_checker, error_logger,
+                                 individual_error_logger, train_x, train_y)
             },
         Estimate::NN => {
             if !has_integer_support(&train_x) || !has_integer_support(&test_x) {
@@ -75,22 +85,22 @@ pub fn run_fbleau(train_x: Array2<f64>, train_y: Array1<Label>,
             let estimator = KNNEstimator::new(&test_x.view(), &test_y.view(),
                                               train_x.nrows(), distance,
                                               KNNStrategy::NN);
-            run_forward_strategy(estimator, convergence_checker, logfile,
-                                 train_x, train_y)
+            run_forward_strategy(estimator, convergence_checker, error_logger,
+                                 individual_error_logger, train_x, train_y)
             },
         Estimate::KNN => {
             let estimator = KNNEstimator::new(&test_x.view(), &test_y.view(),
                                               train_x.nrows(), distance,
                                               knn_strategy.expect(
                                                   "Specify a k-NN strategy."));
-            run_forward_strategy(estimator, convergence_checker, logfile,
-                                 train_x, train_y)
+            run_forward_strategy(estimator, convergence_checker, error_logger,
+                                 individual_error_logger, train_x, train_y)
             },
         Estimate::NNBound => {
             let estimator = NNBoundEstimator::new(&test_x.view(), &test_y.view(),
                                                   distance, nlabels);
-            run_forward_strategy(estimator, convergence_checker, logfile,
-                                 train_x, train_y)
+            run_forward_strategy(estimator, convergence_checker, error_logger,
+                                 individual_error_logger, train_x, train_y)
             },
     };
     (min_error, last_error, random_guessing)
@@ -107,23 +117,23 @@ pub fn run_fbleau(train_x: Array2<f64>, train_y: Array1<Label>,
 ///       available).
 fn run_forward_strategy<E>(mut estimator: E,
                            mut convergence_checker: Option<ForwardChecker>,
-                           logfile: Option<String>, train_x: Array2<f64>,
-                           train_y: Array1<Label>) -> (f64, f64)
+                           error_logger: &mut Option<Logger<f64>>,
+                           individual_error_logger: &mut Option<Logger<bool>>,
+                           train_x: Array2<f64>, train_y: Array1<Label>)
+        -> (f64, f64)
 where E: BayesEstimator {
-    // Init log file.
-    let mut logfile = if let Some(fname) = logfile {
-        let mut logfile = File::create(&fname)
-                               .expect("couldn't open file for verbose logging");
-        writeln!(logfile, "n, error-count, estimate")
-            .expect("failed to write to verbose file");
-        Some(logfile)
-    } else {
-        None
-    };
+    // Init logfile, if specified.
+    if let Some(ref mut logger) = error_logger {
+        if let Logger::LogFile(file) = logger {
+            writeln!(file, "n, error-count, estimate")
+                    .expect("Could not write to log file");
+        }
+    }
 
     // We keep track both of the minimum and of the last estimate.
     let mut min_error = 1.0;
     let mut last_error = 1.0;
+    let mut min_individual_errors = vec![];
 
     for (n, (x, y)) in train_x.outer_iter().zip(train_y.iter()).enumerate() {
         // Compute error.
@@ -133,11 +143,18 @@ where E: BayesEstimator {
 
         if min_error > last_error {
             min_error = last_error;
+            min_individual_errors = estimator.get_individual_errors();
         }
 
-        if let Some(ref mut logfile) = logfile {
-            writeln!(logfile, "{}, {}, {}", n, estimator.get_error_count(),
-                     last_error).expect("failed to write to verbose file");
+        // Log current error.
+        if let Some(ref mut logger) = error_logger {
+            match logger {
+                Logger::LogFile(file) =>
+                    writeln!(file, "{}, {}, {}", n,
+                             estimator.get_error_count(), last_error)
+                        .expect("Could not write to log file"),
+                Logger::LogVec(v) => v.push(last_error),
+            }
         }
 
         // Should we stop because of (delta, q)-convergence?
@@ -146,6 +163,17 @@ where E: BayesEstimator {
             if checker.all_converged() {
                 break;
             }
+        }
+    }
+
+    // Log individual test errors.
+    if let Some(logger) = individual_error_logger {
+        match logger {
+            Logger::LogFile(file) => {
+                writeln!(file, "{:?}", min_individual_errors);
+            },
+            Logger::LogVec(v) => v.extend(min_individual_errors.iter()
+                                                               .cloned()),
         }
     }
 

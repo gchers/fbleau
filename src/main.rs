@@ -65,11 +65,12 @@ extern crate strsim;
 
 extern crate fbleau;
 
+use std::fs::File;
 use docopt::Docopt;
 
 use fbleau::estimates::*;
 use fbleau::security_measures::*;
-use fbleau::fbleau_estimation::run_fbleau;
+use fbleau::fbleau_estimation::{Logger,run_fbleau};
 use fbleau::utils::load_data;
 
 const USAGE: &str = "
@@ -92,8 +93,8 @@ Arguments:
 
 Options:
     --logfile=<fname>           Log estimates at each step.
-    --logerrors=<fname>         Log the error for each test object at every
-                                step.
+    --logerrors=<fname>         Log the individual error for each test object
+                                for the smallest error estimate.
     --delta=<d>                 Delta for delta covergence.
     --qstop=<q>                 Number of examples to declare
                                 delta-convergence. Default is 10% of
@@ -139,11 +140,26 @@ fn main() {
     let (eval_x, eval_y) = load_data::<f64>(&args.arg_eval)
                                 .expect("[!] failed to load evaluation data");
 
+    // Logging.
+    let mut error_logger = match args.flag_logfile {
+        Some(fname) => Some(Logger::LogFile(File::create(&fname)
+                                        .expect("Couldn't open file for logging"))),
+        None => None,
+    };
+
+    let mut individual_error_logger = match args.flag_logerrors {
+        Some(fname) => Some(Logger::LogFile(File::create(&fname)
+                                        .expect("Couldn't open file for logging"))),
+        None => None,
+    };
+
+    // Run.
     let (min_error, _, random_guessing) = 
         run_fbleau(train_x, train_y, eval_x, eval_y, args.arg_estimate,
-                   args.flag_knn_strategy, args.flag_distance, args.flag_logfile,
-                   args.flag_delta, args.flag_qstop, args.flag_absolute,
-                   args.flag_scale);
+                   args.flag_knn_strategy, args.flag_distance,
+                   &mut error_logger, &mut individual_error_logger,
+                   args.flag_delta, args.flag_qstop,
+                   args.flag_absolute, args.flag_scale);
 
     println!();
     println!("Minimum estimate: {}", min_error);

@@ -34,21 +34,20 @@ fn pyfbleau(_py: Python, m: &PyModule) -> PyResult<()> {
     /// qstop : use to stop fbleau when it reaches (delta, qstop)-convergence
     /// absolute : measure absolute instead of relative convergence
     /// scale : scale observations' features in [0,1]
-	#[pyfn(m, "run_fbleau")]
-	fn run_fbleau_py(_py: Python,
+    #[pyfn(m, "run_fbleau")]
+    fn run_fbleau_py(_py: Python,
                      train_x: &PyArray2<f64>, train_y: &PyArray1<Label>,
-					 test_x: &PyArray2<f64>, test_y: &PyArray1<Label>,
-					 estimate: &str, knn_strategy: Option<&str>,
-					 distance: Option<String>, logfile: Option<String>,
-					 delta: Option<f64>, qstop: Option<usize>, absolute: bool,
-                     scale: bool)
-			-> (f64, f64, f64) {
+                     test_x: &PyArray2<f64>, test_y: &PyArray1<Label>,
+                     estimate: &str, knn_strategy: Option<&str>,
+                     distance: Option<String>, logfile: Option<String>,
+                     delta: Option<f64>, qstop: Option<usize>, absolute: bool,
+                     scale: bool) -> (f64, f64, f64) {
 
         // FIXME: Make run_fbleau() accept just a reference to them.
-		let train_x = train_x.as_array().to_owned();
-		let train_y = train_y.as_array().to_owned();
-		let test_x = test_x.as_array().to_owned();
-		let test_y = test_y.as_array().to_owned();
+        let train_x = train_x.as_array().to_owned();
+        let train_y = train_y.as_array().to_owned();
+        let test_x = test_x.as_array().to_owned();
+        let test_y = test_y.as_array().to_owned();
 
         // TODO: a more compact way to do the following is by
         // using serde's Deserialize (already implemented for Estimate
@@ -70,8 +69,8 @@ fn pyfbleau(_py: Python, m: &PyModule) -> PyResult<()> {
             None
         };
 
-		run_fbleau(train_x, train_y, test_x, test_y, estimate, knn_strategy,
-				   distance, logfile, delta, qstop, absolute, scale)
-	}
-	Ok(())
+        run_fbleau(train_x, train_y, test_x, test_y, estimate, knn_strategy,
+                   distance, logfile, delta, qstop, absolute, scale)
+    }
+    Ok(())
 }
