@@ -75,18 +75,6 @@ fn load_iris() -> (Array2<f64>, Array1<Label>, Array2<f64>, Array1<Label>) {
     (train_x, train_y, test_x, test_y)
 }
 
-fn bench_knn_init(b: &mut Bencher) {
-
-    let (train_x, train_y, test_x, test_y) = load_boston();
-    let max_n = train_x.nrows();
-
-    b.iter(|| {
-        let _knn = KNNEstimator::from_data(&train_x.view(), &train_y.view(),
-                                &test_x.view(), &test_y.view(), max_n,
-                                euclidean_distance, KNNStrategy::Ln);
-    })
-}
-        
 fn bench_knn_forward(b: &mut Bencher) {
     let (train_x, train_y, test_x, test_y) = load_boston();
     let n_train = train_x.nrows();
@@ -108,6 +96,5 @@ fn bench_knn_forward(b: &mut Bencher) {
     });
 }
 
-benchmark_group!(benches, bench_knn_init,
-                 bench_knn_forward);
+benchmark_group!(benches, bench_knn_forward);
 benchmark_main!(benches);
