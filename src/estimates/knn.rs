@@ -15,6 +15,8 @@
 //! ```
 //! #[macro_use(array)]
 //! extern crate ndarray;
+//! #[macro_use]
+//! extern crate itertools;
 //! extern crate fbleau;
 //!
 //! # fn main() {
@@ -30,30 +32,21 @@
 //! let test_x = array![[3.],
 //!                     [0.],
 //!                     [6.],
-//!                     [1.],
 //!                     [6.],
 //!                     [4.],
 //!                     [5.]];
-//! let test_y = array![0, 0, 2, 1, 0, 1, 0];
+//! let test_y = array![0, 0, 1, 0, 1, 0];
 //! let max_n = train_x.nrows();
 //! 
-//! let k = 3;
-//! let mut knn = KNNEstimator::from_data(&train_x.view(), &train_y.view(),
-//!                             &test_x.view(), &test_y.view(), max_n,
-//!                             euclidean_distance, KNNStrategy::FixedK(k));
+//! let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(), max_n,
+//!                                 euclidean_distance,
+//!                                 KNNStrategy::NN);
+//! for (x, y) in izip!(train_x.outer_iter(), train_y.iter()) {
+//!     knn.add_example(&x, *y);
+//! }
 //!
-//! assert_eq!(knn.get_error(), 0.42857142857142855);
-//!
-//! knn.add_example(&array![3.].view(), 1);
-//! assert_eq!(knn.get_error(), 0.42857142857142855);
-//!
-//! // Change k.
-//! knn.set_k(5);
-//! knn.add_example(&array![2.].view(), 1);
-//! assert_eq!(knn.get_error(), 0.42857142857142855);
-//!
-//! knn.add_example(&array![1.].view(), 2);
-//! assert_eq!(knn.get_error(), 0.42857142857142855);
+//! assert_eq!(knn.get_error(), 0.5);
+//! assert_eq!(knn.get_error_count(), 3);
 //! # }
 //! ```
 use std;
@@ -62,6 +55,7 @@ use std::collections::HashMap;
 use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
 use float_cmp::approx_eq;
+use itertools::Itertools;
 
 use Label;
 use estimates::{BayesEstimator,KNNStrategy,knn_strategy};
@@ -403,21 +397,58 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
 }
 
 
+
+/// Stores the error for a single test point, for every choice of label.
+///
+#[derive(Debug)]
+struct PointError {
+    risk: HashMap<Option<Label>, u32>,
+}
+
+impl PointError {
+    /// Creates a new PointError.
+    fn new(test_y: &Vec<Label>) -> PointError {
+        let mut risk = HashMap::new();
+
+        // NOTE: the following can be optimized.
+        for y in test_y.iter().unique() {
+            let count = test_y.iter()
+                              .fold(0u32, |acc, yi| if yi == y {
+                                            acc
+                                        } else {
+                                            acc + 1
+                                        });
+            risk.insert(Some(*y), count);
+        }
+
+        risk.insert(None, test_y.len() as u32);
+
+        PointError {
+            risk
+        }
+    }
+
+    /// Returns the error count for the selected prediction.
+    fn get_error(&self, prediction: Label) -> u32 {
+        match self.risk.get(&Some(prediction)) {
+            Some(count) => *count,
+            None => *self.risk.get(&None)
+                              .expect("Logic error")
+        }
+    }
+}
+
+
 /// Keeps track of the error of a k-NN classifier, with the possibility
 /// of changing k and removing training examples.
 pub struct KNNEstimator<D>
 where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
-      //K: Fn(usize) -> usize {
-    // max_k nearest neighbors for each test object.
+    // Stores max_k nearest neighbors for each unique test point.
     neighbors: Vec<NearestNeighbors<D>>,
-    // Error for each test object.
-    // TODO: we could have bit vectors (e.g., Vec<bool> or BitVec)
-    // for errors. This should (very slightly) improve memory performance.
-    pub errors: Vec<u32>,
-    // Current prediction for each test label.
-    pub predictions: Vec<Label>,
-    // True test labels.
-    labels: Vec<Label>,
+    // Current prediction for each unique test point.
+    predictions: Vec<Label>,
+    // Validation error for each unique test point.
+    errors: Vec<PointError>,
     // Last queried k.
     current_k: usize,
     // k-NN count, for k = current_k.
@@ -426,6 +457,8 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
     // remove_one() is n-1. The next training example to be added by
     // add_example() is n-1.
     n: usize,
+    // Size of the test (validation) data.
+    n_test: usize,
     // Function k(n) used to determine the value of k given n.
     // TODO: might be replaced with a closure in the future, for
     // better performances.
@@ -449,80 +482,47 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         // results once we've seen all the training data.
         let max_k = k_from_n(max_n);
 
-        let neighbors = test_x.outer_iter()
-                              .map(|x| NearestNeighbors::new(&x, max_k, distance))
-                              .collect::<Vec<_>>();
+        let mut neighbors = Vec::new();
+        let mut errors = vec![];
+
+        // Convert elements to OrderedFloat to allow comparisons.
+        let test_x = test_x.map(|x| OrderedFloat::from(*x));
+
+        // Only keep unique test objects.
+        for x in test_x.outer_iter().unique() {
+            neighbors.push(NearestNeighbors::new(&x.map(|x| x.into_inner())
+                                                   .view(), max_k, distance));
+            // Select labels with object x.
+            let labels_x = test_x.outer_iter()
+                                 .zip(test_y)
+                                 .filter_map(|(xi, yi)|
+                                          if xi == x {
+                                              Some(*yi)
+                                          } else {
+                                              None
+                                          })
+                                .collect::<Vec<_>>();
+            errors.push(PointError::new(&labels_x));
+        }
+
+
         // We initially set all predictions to 0. Therefore, we need to
         // adjust the error count accordingly. Note that this is updated as
         // soon as add_example() is called.
-        // A more proper way to do this in Rust would be to set
-        // predictions (and errors, k_error_count, ...) to an Option value.
-        // TODO: should we?
-        let errors = test_y.iter()
-                           .map(|y| if *y != 0 { 1 } else { 0 })
-                           .collect::<Vec<_>>();
-        let error_count = errors.iter().sum();
+        let predictions = vec![0; neighbors.len()];
 
-        KNNEstimator {
-            neighbors,
-            errors,
-            predictions: vec![0; test_y.len()],
-            labels: test_y.to_vec(),
-            current_k: 1,
-            k_error_count: error_count,
-            n: 0,
-            k_from_n,
-        }
-    }
-
-    /// Create a k-NN estimator from training and test set.
-    pub fn from_data(train_x: &ArrayView2<f64>, train_y: &ArrayView1<Label>,
-            test_x: &ArrayView2<f64>, test_y: &ArrayView1<Label>,
-            max_n: usize, distance: D, strategy: KNNStrategy)
-            -> KNNEstimator<D> {
-        assert_eq!(train_x.ncols(), test_x.ncols());
-        assert_eq!(train_x.nrows(), train_y.len());
-        assert_eq!(test_x.nrows(), test_y.len());
-        assert!(!train_x.is_empty());
-        assert!(!test_x.is_empty());
-
-        // How we select k given n.
-        let k_from_n = knn_strategy(strategy);
-        // Maximum number of neighbors to store (excluding ties).
-        let max_k = k_from_n(max_n);
-
-        let neighbors = test_x.outer_iter()
-                            .map(|x| NearestNeighbors::from_data(&x,
-                                                           &train_x.view(),
-                                                           &train_y.view(),
-                                                           max_k,
-                                                           distance))
-                            .collect::<Vec<_>>();
-
-        let n = train_y.len();
-        let k = k_from_n(n);
-        let mut knn_error = 0;
-        let mut errors = Vec::with_capacity(test_y.len());
-        let mut predictions = Vec::with_capacity(test_y.len());
-
-        for (neigh, y) in neighbors.iter().zip(test_y) {
-            let pred = neigh.predict(k)
-                            .expect("unexpected error");
-            let error = if pred != *y { 1 } else { 0 };
-
-            predictions.push(pred);
-            errors.push(error);
-            knn_error += error;
-        }
+        let error_count = izip!(&predictions, &errors)
+                            .map(|(pred, error)| error.get_error(*pred))
+                            .sum();
 
         KNNEstimator {
             neighbors,
             errors,
             predictions,
-            labels: test_y.to_vec(),
-            current_k: k,
-            k_error_count: knn_error,
-            n,
+            current_k: 1,
+            k_error_count: error_count,
+            n: 0,
+            n_test: test_x.nrows(),
             k_from_n,
         }
     }
@@ -531,25 +531,26 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     ///
     /// Called when when k changes.
     fn update_all(&mut self) -> Result<(), ()> {
-
-        for (neigh, y, old_pred, old_error) in
-                izip!(&self.neighbors, &self.labels,
-                      &mut self.predictions, &mut self.errors) {
+        for (neigh, old_pred, error) in izip!(&self.neighbors,
+                                              &mut self.predictions,
+                                              &mut self.errors) {
+            // New prediction for this neighbor.
             let pred = neigh.predict(self.current_k)?;
             if pred == *old_pred {
                 continue;
             }
-            let error = if pred != *y { 1 } else { 0 };
 
-            match (error, *old_error) {
+            // Update error as appropriate.
+            let new_error = error.get_error(pred);
+            let old_error = error.get_error(*old_pred);
+            *old_pred = pred;
+
+            match (new_error, old_error) {
                 (1, 0) => { self.k_error_count += 1 },
                 (0, 1) => { self.k_error_count -= 1 },
                 // No need to update.
                 _ => {},
             };
-
-            *old_pred = pred;
-            *old_error = error;
         }
         Ok(())
     }
@@ -572,15 +573,16 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     fn add_example(&mut self, x: &ArrayView1<f64>, y: Label) -> Result<(), ()> {
         // Update k with respect to n.
         self.set_k((self.k_from_n)(self.n))?;
-        // We update n here, before error are (possibly) raised.
+        // We update n here, before errors are (possibly) raised.
         self.n += 1;
         // We copy because we're using them in the closure below.
         let current_k = self.current_k;
 
         // Update errors and neighbors as appropriate.
-        for (neigh, true_y, old_pred, old_error) in
-                izip!(&mut self.neighbors, &self.labels,
-                      &mut self.predictions, &mut self.errors) {
+        for (neigh, old_pred, error) in izip!(&mut self.neighbors,
+                                              &mut self.predictions,
+                                              &mut self.errors) {
+            // NOTE: add_example() returns false if no update is needed.
             if neigh.add_example(x, y) {
                 if neigh.updated_k > current_k {
                     continue;
@@ -593,20 +595,16 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
                 }
 
                 // Update error.
-                let error = if pred != *true_y { 1 } else { 0 };
-
+                let new_error = error.get_error(pred);
+                let old_error = error.get_error(*old_pred);
                 *old_pred = pred;
 
-                match (error, *old_error) {
+                match (new_error, old_error) {
                     (1, 0) => { self.k_error_count += 1 },
                     (0, 1) => { self.k_error_count -= 1 },
-                    // No need to update. Note that we do not need
-                    // to set *old_error = error either, as they're
-                    // also the same. So we can return now.
+                    // No need to update.
                     _ => { continue },
                 };
-
-                *old_error = error;
             }
         }
 
@@ -620,18 +618,12 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
 
     /// Returns the error for the current k.
     fn get_error(&self) -> f64 {
-        f64::from(self.k_error_count) / (self.labels.len() as f64)
+        f64::from(self.k_error_count) / (self.n_test as f64)
     }
 
     /// Returns the current errors for each test point.
     fn get_individual_errors(&self) -> Vec<bool> {
-        self.errors.iter()
-                   .map(|e| match e {
-                            0 => false,
-                            1 => true,
-                            _ => panic!("errors must contain values in {0,1}")
-                            })
-                   .collect::<Vec<_>>()
+        unimplemented!();
     }
 }
 
@@ -808,17 +800,6 @@ mod tests {
         let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(),
                                         max_n, distance, KNNStrategy::NN);
 
-        // FIXME: I'm not sure why in this case, differently from the
-        // backward test, I need to include one more error and prediction.
-        // The rest is exactly identical.
-        let expected_preds = vec![[1, 2, 0, 2, 0, 0, 1],
-                                  [1, 1, 0, 1, 0, 0, 1],
-                                  [1, 1, 0, 1, 0, 0, 1],
-                                  [0, 0, 0, 0, 0, 0, 1],
-                                  [1, 1, 0, 1, 0, 1, 1],
-                                  [0, 0, 0, 0, 0, 0, 0],
-                                  [0, 0, 0, 0, 0, 0, 0],
-                                  [0, 0, 0, 0, 0, 0, 0]];
         let expected_error = vec![0.8571428571428571, 0.7142857142857143,
                                   0.7142857142857143, 0.5714285714285714,
                                   0.5714285714285714, 0.42857142857142855,
@@ -828,8 +809,8 @@ mod tests {
 
         for (i, (x, y)) in train_x.outer_iter().zip(train_y.iter()).enumerate() {
             knn.add_example(&x, *y).unwrap();
-            assert_eq!(knn.predictions, expected_preds[expected_preds.len()-1-i]);
-            assert_eq!(knn.get_error(), expected_error[expected_error.len()-1-i]);
+            assert_eq!(knn.get_error(),
+                       expected_error[expected_error.len()-1-i]);
         }
 
         // Test when changing k.
@@ -847,22 +828,12 @@ mod tests {
                                   0.42857142857142855, 0.5714285714285714,
                                   0.42857142857142855, 0.42857142857142855,
                                   0.42857142857142855, 0.42857142857142855];
-        let expected_preds = vec![vec![0; 7], vec![0; 7], vec![0; 7],
-                                  //NOTE: the prediction vector right
-                                  //below this comment may also be
-                                  //vec![1, 1, 1, 1, 0, 1, 0].
-                                  vec![1, 1, 0, 1, 0, 1, 1],
-                                  vec![0; 7],
-                                  vec![1, 1, 0, 1, 0, 1, 0],
-                                  vec![1, 1, 0, 1, 0, 1, 0],
-                                  vec![1, 1, 0, 1, 0, 1, 0]];
         let ks = vec![1, 1, 1, 1, 3, 3, 5, 5];
 
         for (i, (x, y)) in train_x.outer_iter().zip(train_y.iter()).enumerate() {
             knn.set_k(ks[i]).unwrap();
             knn.add_example(&x, *y).unwrap();
             assert_eq!(knn.get_error(), expected_error[i]);
-            assert_eq!(knn.predictions, expected_preds[i]);
         }
     }
 
@@ -947,4 +918,21 @@ mod tests {
         assert_eq!(knn.predictions, vec![1]);
     }
     */
+
+    #[test]
+    fn test_point_error() {
+        // Suppose we observe the following labels, associated with the same
+        // object.
+        let test_labels = vec![0, 0, 0, 1, 1, 2];
+
+        let error = PointError::new(&test_labels);
+
+        // Seen label return the count of the remaining objects.
+        assert_eq!(error.get_error(0), 3);
+        assert_eq!(error.get_error(1), 4);
+        assert_eq!(error.get_error(2), 5);
+        // Unseen labels return the maximum number of errors.
+        assert_eq!(error.get_error(3), 6);
+        assert_eq!(error.get_error(5), 6);
+    }
 }
