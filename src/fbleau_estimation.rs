@@ -143,7 +143,9 @@ where E: BayesEstimator {
 
         if min_error > last_error {
             min_error = last_error;
-            min_individual_errors = estimator.get_individual_errors();
+            if individual_error_logger.is_some() {
+                min_individual_errors = estimator.get_individual_errors();
+            }
         }
 
         // Log current error.
