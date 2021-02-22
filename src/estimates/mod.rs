@@ -12,7 +12,7 @@ pub use self::frequentist::FrequentistEstimator;
 pub use self::convergence::ForwardChecker;
 pub use self::knn_utils::*;
 
-use Label;
+use crate::Label;
 use ndarray::prelude::*;
 
 /// Estimators that F-BLEAU currently provides.

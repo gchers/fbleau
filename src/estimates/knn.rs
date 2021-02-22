@@ -63,8 +63,8 @@ use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
 use float_cmp::approx_eq;
 
-use Label;
-use estimates::{BayesEstimator,KNNStrategy,knn_strategy};
+use crate::Label;
+use crate::estimates::{BayesEstimator,KNNStrategy,knn_strategy};
 
 /// Nearest neighbors to a test object.
 #[derive(Debug)]
@@ -629,7 +629,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
                    .map(|e| match e {
                             0 => false,
                             1 => true,
-                            _ => panic!("errors must contain values in {0,1}")
+                            _ => panic!("{}", "errors must contain values in {0,1}")
                             })
                    .collect::<Vec<_>>()
     }
@@ -639,7 +639,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use estimates::*;
+    use crate::estimates::*;
 
     #[test]
     fn knn_init() {

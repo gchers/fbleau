@@ -1,6 +1,5 @@
 #[macro_use]
 extern crate bencher;
-#[macro_use]
 extern crate ndarray;
 extern crate rustlearn;
 

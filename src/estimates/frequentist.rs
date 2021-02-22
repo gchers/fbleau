@@ -4,8 +4,8 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use ordered_float::OrderedFloat;
 
-use Label;
-use estimates::{BayesEstimator,some_or_error};
+use crate::Label;
+use crate::estimates::{BayesEstimator,some_or_error};
 
 // Type of the elements of a feature vector.
 type ObjectValue = usize;

@@ -12,9 +12,9 @@ use ndarray::*;
 use std::fs::File;
 use std::io::Write;
 
-use Label;
-use estimates::*;
-use utils::{prepare_data, estimate_random_guessing,has_integer_support};
+use crate::Label;
+use crate::estimates::*;
+use crate::utils::{prepare_data, estimate_random_guessing,has_integer_support};
 
 
 /// Log data either to a .csv file or into a Vec.

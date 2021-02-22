@@ -6,7 +6,7 @@ use csv::ReaderBuilder;
 use std::str::FromStr;
 use std::f64;
 
-use Label;
+use crate::Label;
 
 /// Loads a CSV data file.
 ///

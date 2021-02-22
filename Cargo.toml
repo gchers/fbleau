@@ -8,6 +8,7 @@ repository = "https://github.com/gchers/fbleau"
 exclude = [
     "examples/*"
 ]
+edition = "2018"
 
 [lib]
 name = "fbleau"

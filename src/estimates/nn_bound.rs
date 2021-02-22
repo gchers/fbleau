@@ -1,8 +1,8 @@
 //! An estimator returning the bound based on the NN classifier.
 use ndarray::*;
 
-use Label;
-use estimates::{BayesEstimator,KNNEstimator,KNNStrategy,nn_bound};
+use crate::Label;
+use crate::estimates::{BayesEstimator,KNNEstimator,KNNStrategy,nn_bound};
 
 /// Defines an estimator that returns the NN bound by Cover&Hart.
 ///

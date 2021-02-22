@@ -6,7 +6,7 @@
 use std::collections::{HashMap, VecDeque};
 use ordered_float::OrderedFloat;
 
-use estimates::{some_or_error};
+use crate::estimates::{some_or_error};
 
 /// Returns relative or absolute change between two measurements.
 fn change(a: f64, b: f64, relative: bool) -> f64 {
