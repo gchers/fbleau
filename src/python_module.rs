@@ -5,9 +5,9 @@ use numpy::*;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use Label;
-use estimates::*;
-use fbleau_estimation::{Logger,run_fbleau};
+use crate::Label;
+use crate::estimates::*;
+use crate::fbleau_estimation::{Logger,run_fbleau};
 
 /// F-BLEAU is a tool for estimating the leakage of a system about its secrets
 /// in a black-box manner (i.e., by only looking at examples of secret inputs
@@ -51,10 +51,10 @@ fn pyfbleau(_py: Python, m: &PyModule) -> PyResult<()> {
                      scale: bool) -> PyResult<PyObject> {
 
         // FIXME: Make run_fbleau() accept just a reference to them.
-        let train_x = train_x.as_array().to_owned();
-        let train_y = train_y.as_array().to_owned();
-        let test_x = test_x.as_array().to_owned();
-        let test_y = test_y.as_array().to_owned();
+        let train_x = unsafe { train_x.as_array().to_owned() };
+        let train_y = unsafe { train_y.as_array().to_owned() };
+        let test_x = unsafe { test_x.as_array().to_owned() };
+        let test_y = unsafe { test_y.as_array().to_owned() };
 
         // TODO: a more compact way to do the following is by
         // using serde's Deserialize (already implemented for Estimate
