@@ -221,13 +221,40 @@ The function `run_fbleau()` returns a dictionary, containing:
   the individual errors (`true` if error, `false` otherwise) for each test object, corresponding to
   the best (i.e., smallest) estimate
 
-Simple example:
+## Example
+
+Simple example, using the example data provided in `examples/`.
+
 ```python
-fbleau.run_fbleau(train_x, train_y, test_x, test_y, estimate='knn',
-                  knn_strategy='ln', distance='euclidean', log_errors=false,
-                  log_individual_errors=false, delta=None, qstop=None,
-                  absolute=false, scale=false)
+import fbleau
+import numpy as np
+
+train_data = np.loadtxt("examples/geometric-4.train.csv", delimiter=",")
+validation_data = np.loadtxt("examples/geometric-4.test.csv", delimiter=",")
+
+train_secrets = train_data[:,0].astype(np.uint64)
+validation_secrets = validation_data[:,0].astype(np.uint64)
+
+train_observations = train_data[:,1:]
+validation_observations = validation_data[:,1:]
+
+
+fbleau.run_fbleau(train_observations, train_secrets, validation_observations,
+                  validation_secrets, estimate='knn',
+                  knn_strategy='ln', distance='euclidean', log_errors=False,
+                  log_individual_errors=False, delta=None, qstop=None,
+                  absolute=False, scale=False)
 ```
+
+The above returns:
+
+```
+{'min-estimate': 0.4728,                                                        
+ 'last-estimate': 0.47335,                 
+ 'random-guessing': 0.913,                                         
+ 'estimates': [],     
+ 'min-individual-errors': []}
+ ```
 
 # TODO
 
