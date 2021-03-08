@@ -56,8 +56,8 @@
 //! - log10
 //! The choice between the two cannot be done a priori: one should try both,
 //! and see which one produces the smallest estimate.
-extern crate ndarray;
 extern crate docopt;
+extern crate ndarray;
 #[macro_use]
 extern crate serde;
 extern crate itertools;
@@ -65,12 +65,12 @@ extern crate strsim;
 
 extern crate fbleau;
 
-use std::fs::File;
 use docopt::Docopt;
+use std::fs::File;
 
 use fbleau::estimates::*;
+use fbleau::fbleau_estimation::{run_fbleau, Logger};
 use fbleau::security_measures::*;
-use fbleau::fbleau_estimation::{Logger,run_fbleau};
 use fbleau::utils::load_data;
 
 const USAGE: &str = "
@@ -125,41 +125,52 @@ struct Args {
     arg_eval: String,
 }
 
-
 fn main() {
     // Parse args from command line.
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.version(Some(env!("CARGO_PKG_VERSION")
-                                                            .to_string()))
-                                           .deserialize())
-                            .unwrap_or_else(|e| e.exit());
+        .and_then(|d| {
+            d.version(Some(env!("CARGO_PKG_VERSION").to_string()))
+                .deserialize()
+        })
+        .unwrap_or_else(|e| e.exit());
 
     // Load data.
-    let (train_x, train_y) = load_data::<f64>(&args.arg_train)
-                                .expect("[!] failed to load training data");
-    let (eval_x, eval_y) = load_data::<f64>(&args.arg_eval)
-                                .expect("[!] failed to load evaluation data");
+    let (train_x, train_y) =
+        load_data::<f64>(&args.arg_train).expect("[!] failed to load training data");
+    let (eval_x, eval_y) =
+        load_data::<f64>(&args.arg_eval).expect("[!] failed to load evaluation data");
 
     // Logging.
     let mut error_logger = match args.flag_logfile {
-        Some(fname) => Some(Logger::LogFile(File::create(&fname)
-                                        .expect("Couldn't open file for logging"))),
+        Some(fname) => Some(Logger::LogFile(
+            File::create(&fname).expect("Couldn't open file for logging"),
+        )),
         None => None,
     };
 
     let mut individual_error_logger = match args.flag_logerrors {
-        Some(fname) => Some(Logger::LogFile(File::create(&fname)
-                                        .expect("Couldn't open file for logging"))),
+        Some(fname) => Some(Logger::LogFile(
+            File::create(&fname).expect("Couldn't open file for logging"),
+        )),
         None => None,
     };
 
     // Run.
-    let (min_error, _, random_guessing) = 
-        run_fbleau(train_x, train_y, eval_x, eval_y, args.arg_estimate,
-                   args.flag_knn_strategy, args.flag_distance,
-                   &mut error_logger, &mut individual_error_logger,
-                   args.flag_delta, args.flag_qstop,
-                   args.flag_absolute, args.flag_scale);
+    let (min_error, _, random_guessing) = run_fbleau(
+        train_x,
+        train_y,
+        eval_x,
+        eval_y,
+        args.arg_estimate,
+        args.flag_knn_strategy,
+        args.flag_distance,
+        &mut error_logger,
+        &mut individual_error_logger,
+        args.flag_delta,
+        args.flag_qstop,
+        args.flag_absolute,
+        args.flag_scale,
+    );
 
     println!();
     println!("Minimum estimate: {}", min_error);

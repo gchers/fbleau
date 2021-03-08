@@ -5,9 +5,9 @@ use numpy::*;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::Label;
 use crate::estimates::*;
-use crate::fbleau_estimation::{Logger,run_fbleau};
+use crate::fbleau_estimation::{run_fbleau, Logger};
+use crate::Label;
 
 /// F-BLEAU is a tool for estimating the leakage of a system about its secrets
 /// in a black-box manner (i.e., by only looking at examples of secret inputs
@@ -40,16 +40,22 @@ fn pyfbleau(_py: Python, m: &PyModule) -> PyResult<()> {
     /// absolute : measure absolute instead of relative convergence
     /// scale : scale observations' features in [0,1]
     #[pyfn(m, "run_fbleau")]
-    fn run_fbleau_py(py: Python,
-                     train_x: &PyArray2<f64>, train_y: &PyArray1<Label>,
-                     test_x: &PyArray2<f64>, test_y: &PyArray1<Label>,
-                     estimate: &str, knn_strategy: Option<&str>,
-                     distance: Option<String>,
-                     log_errors: bool,
-                     log_individual_errors: bool,
-                     delta: Option<f64>, qstop: Option<usize>, absolute: bool,
-                     scale: bool) -> PyResult<PyObject> {
-
+    fn run_fbleau_py(
+        py: Python,
+        train_x: &PyArray2<f64>,
+        train_y: &PyArray1<Label>,
+        test_x: &PyArray2<f64>,
+        test_y: &PyArray1<Label>,
+        estimate: &str,
+        knn_strategy: Option<&str>,
+        distance: Option<String>,
+        log_errors: bool,
+        log_individual_errors: bool,
+        delta: Option<f64>,
+        qstop: Option<usize>,
+        absolute: bool,
+        scale: bool,
+    ) -> PyResult<PyObject> {
         // FIXME: Make run_fbleau() accept just a reference to them.
         let train_x = unsafe { train_x.as_array().to_owned() };
         let train_y = unsafe { train_y.as_array().to_owned() };
@@ -64,13 +70,17 @@ fn pyfbleau(_py: Python, m: &PyModule) -> PyResult<()> {
             "knn" => Estimate::KNN,
             "frequentist" => Estimate::Frequentist,
             "nn-bound" => Estimate::NNBound,
-            _ => { unimplemented!() },
+            _ => {
+                unimplemented!()
+            }
         };
         let knn_strategy = if let Some(strategy) = knn_strategy {
             match strategy {
                 "ln" => Some(KNNStrategy::Ln),
                 "log10" => Some(KNNStrategy::Log10),
-                _ => { unimplemented!() },
+                _ => {
+                    unimplemented!()
+                }
             }
         } else {
             None
@@ -89,28 +99,42 @@ fn pyfbleau(_py: Python, m: &PyModule) -> PyResult<()> {
             None
         };
 
-        let (min_error, last_error, random_guessing) =
-            run_fbleau(train_x, train_y, test_x, test_y, estimate,
-                       knn_strategy, distance, &mut error_logger,
-                       &mut individual_error_logger, delta, qstop, absolute,
-                       scale);
+        let (min_error, last_error, random_guessing) = run_fbleau(
+            train_x,
+            train_y,
+            test_x,
+            test_y,
+            estimate,
+            knn_strategy,
+            distance,
+            &mut error_logger,
+            &mut individual_error_logger,
+            delta,
+            qstop,
+            absolute,
+            scale,
+        );
 
         let res = PyDict::new(py);
         res.set_item("min-estimate", min_error)?;
         res.set_item("last-estimate", last_error)?;
         res.set_item("random-guessing", random_guessing)?;
-        res.set_item("estimates",
-                     if let Some(Logger::LogVec(v)) = error_logger {
-                         v
-                     } else {
-                         vec![]
-                    })?;
-        res.set_item("min-individual-errors",
-                     if let Some(Logger::LogVec(v)) = individual_error_logger {
-                         v
-                     } else {
-                         vec![]
-                     })?;
+        res.set_item(
+            "estimates",
+            if let Some(Logger::LogVec(v)) = error_logger {
+                v
+            } else {
+                vec![]
+            },
+        )?;
+        res.set_item(
+            "min-individual-errors",
+            if let Some(Logger::LogVec(v)) = individual_error_logger {
+                v
+            } else {
+                vec![]
+            },
+        )?;
 
         Ok(res.into())
     }

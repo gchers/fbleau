@@ -3,10 +3,10 @@
 //!
 //! It implements convergence heuristics based on relative/absolute
 //! convergence.
-use std::collections::{HashMap, VecDeque};
 use ordered_float::OrderedFloat;
+use std::collections::{HashMap, VecDeque};
 
-use crate::estimates::{some_or_error};
+use crate::estimates::some_or_error;
 
 /// Returns relative or absolute change between two measurements.
 fn change(a: f64, b: f64, relative: bool) -> f64 {
@@ -59,9 +59,10 @@ impl ForwardChecker {
         ForwardChecker {
             estimates: VecDeque::new(),
             first_n: 0,
-            delta_converged: deltas.iter()
-                                    .map(|d| (OrderedFloat::from(*d), None))
-                                    .collect(),
+            delta_converged: deltas
+                .iter()
+                .map(|d| (OrderedFloat::from(*d), None))
+                .collect(),
             next_deltas: deltas,
             q,
             relative,
@@ -108,7 +109,7 @@ impl ForwardChecker {
         self.estimates.push_back(e);
         // We may have converged for more than one delta, so we need
         // to try until no more updates occour.
-        while self.update_convergence() {};
+        while self.update_convergence() {}
     }
 
     pub fn get_last_change(&self) -> Result<f64, ()> {
@@ -140,7 +141,10 @@ impl ForwardChecker {
         }
         // Check if we converged.
         if self.estimates.len() >= self.q {
-            let c = self.delta_converged.get_mut(&OrderedFloat::from(delta)).unwrap();
+            let c = self
+                .delta_converged
+                .get_mut(&OrderedFloat::from(delta))
+                .unwrap();
             *c = Some(self.first_n);
             // Update next delta.
             self.next_deltas.pop();
@@ -154,15 +158,13 @@ impl ForwardChecker {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn forward_checker_init() {
-        let checker = ForwardChecker::new(&vec![0.1, 0.02, 0.4, 0.001], 1000,
-                                          false);
+        let checker = ForwardChecker::new(&vec![0.1, 0.02, 0.4, 0.001], 1000, false);
 
         assert_eq!(checker.next_deltas, vec![0.001, 0.02, 0.1, 0.4]);
     }
@@ -171,12 +173,12 @@ mod tests {
     fn forward_checker_convergence() {
         let deltas = vec![0.11, 0.06, 0.02, 0.02, 0.019, 0.002, 0.0001];
         let mut checker = ForwardChecker::new(&deltas, 4, false);
-        
-        let estimates = vec![0.9, 0.9, 0.8, 0.7, 0.7, 0.7, 0.65, 0.64, 0.63,
-                             0.63, 0.62, 0.62, 0.6, 0.6, 0.6, 0.599];
-        let expected_conv: Vec<Option<usize>> = vec![Some(2), Some(3), Some(8),
-                                                     Some(8), Some(8), 
-                                                     Some(12), None];
+
+        let estimates = vec![
+            0.9, 0.9, 0.8, 0.7, 0.7, 0.7, 0.65, 0.64, 0.63, 0.63, 0.62, 0.62, 0.6, 0.6, 0.6, 0.599,
+        ];
+        let expected_conv: Vec<Option<usize>> =
+            vec![Some(2), Some(3), Some(8), Some(8), Some(8), Some(12), None];
 
         for e in estimates {
             checker.add_estimate(e);
@@ -191,14 +193,21 @@ mod tests {
     #[test]
     fn absolute_convergence() {
         let deltas = vec![0.15, 0.1, 0.02, 0.02, 0.019, 0.002, 0.0017];
-        let estimates = vec![0.9, 0.9, 0.8, 0.7, 0.7, 0.7, 0.65, 0.64, 0.63,
-                             0.63, 0.62, 0.62, 0.6, 0.6, 0.6, 0.599];
+        let estimates = vec![
+            0.9, 0.9, 0.8, 0.7, 0.7, 0.7, 0.65, 0.64, 0.63, 0.63, 0.62, 0.62, 0.6, 0.6, 0.6, 0.599,
+        ];
 
         let mut fwchecker = ForwardChecker::new(&deltas, 4, false);
-        
-        let expected_conv: Vec<Option<usize>> = vec![Some(2), Some(3), Some(8),
-                                                     Some(8), Some(8), 
-                                                     Some(12), Some(12)];
+
+        let expected_conv: Vec<Option<usize>> = vec![
+            Some(2),
+            Some(3),
+            Some(8),
+            Some(8),
+            Some(8),
+            Some(12),
+            Some(12),
+        ];
 
         for e in estimates {
             fwchecker.add_estimate(e);

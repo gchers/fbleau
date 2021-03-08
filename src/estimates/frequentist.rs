@@ -1,11 +1,11 @@
 //! Frequentist Bayes risks estimate for discrete secret and output space.
-use ndarray::*;
 use itertools::Itertools;
-use std::collections::HashMap;
+use ndarray::*;
 use ordered_float::OrderedFloat;
+use std::collections::HashMap;
 
+use crate::estimates::{some_or_error, BayesEstimator};
 use crate::Label;
-use crate::estimates::{BayesEstimator,some_or_error};
 
 // Type of the elements of a feature vector.
 type ObjectValue = usize;
@@ -44,12 +44,11 @@ impl FrequencyCount {
             if y != pred {
                 // Did the maximum prior change?
                 if self.count[y] > self.count[pred] {
-                    self.prediction =  Some(y);
+                    self.prediction = Some(y);
                     updated = true;
                 }
             }
-        }
-        else {
+        } else {
             self.prediction = Some(y);
             updated = true;
         }
@@ -115,27 +114,30 @@ pub struct FrequentistEstimator {
 }
 
 impl FrequentistEstimator {
-    pub fn new(n_labels: usize, test_x: &ArrayView2<f64>,
-               test_y: &ArrayView1<Label>)
-            -> FrequentistEstimator {
-
+    pub fn new(
+        n_labels: usize,
+        test_x: &ArrayView2<f64>,
+        test_y: &ArrayView1<Label>,
+    ) -> FrequentistEstimator {
         // Init counts.
         let priors_count = FrequencyCount::new(n_labels);
         let mut joint_count: HashMap<ObjectValue, FrequencyCount> = HashMap::new();
 
         // Converts objects (feature vectors) into ids.
         let mut array_to_index = ArrayToIndex::new();
-        let test_x = test_x.outer_iter()
-                           .map(|x| array_to_index.map(x))
-                           .collect::<Vec<_>>();
+        let test_x = test_x
+            .outer_iter()
+            .map(|x| array_to_index.map(x))
+            .collect::<Vec<_>>();
 
         // Instantiate points for which we need a prediction.
         // We'll only have information for the intersection of
         // train_x and test_x; for the others we'll have to guess
         // according to priors.
         for &x in test_x.iter().unique() {
-            joint_count.entry(x)
-                       .or_insert_with(|| FrequencyCount::new(n_labels));
+            joint_count
+                .entry(x)
+                .or_insert_with(|| FrequencyCount::new(n_labels));
         }
 
         FrequentistEstimator {
@@ -150,11 +152,13 @@ impl FrequentistEstimator {
         }
     }
 
-    pub fn from_data(n_labels: usize, train_x: &ArrayView1<ObjectValue>,
-                     train_y: &ArrayView1<Label>, test_x: &ArrayView1<ObjectValue>,
-                     test_y: &ArrayView1<Label>)
-            -> FrequentistEstimator {
-
+    pub fn from_data(
+        n_labels: usize,
+        train_x: &ArrayView1<ObjectValue>,
+        train_y: &ArrayView1<Label>,
+        test_x: &ArrayView1<ObjectValue>,
+        test_y: &ArrayView1<Label>,
+    ) -> FrequentistEstimator {
         // FIXME: instantiate from new().
         // Init counts.
         let mut joint_count: HashMap<ObjectValue, FrequencyCount> = HashMap::new();
@@ -165,15 +169,14 @@ impl FrequentistEstimator {
         // train_x and test_x; for the others we'll have to guess
         // according to priors.
         for &x in test_x.iter().unique() {
-            joint_count.entry(x)
-                       .or_insert_with(|| FrequencyCount::new(n_labels));
+            joint_count
+                .entry(x)
+                .or_insert_with(|| FrequencyCount::new(n_labels));
         }
-
 
         // Count frequencies in training data.
         for (x, &y) in train_x.iter().zip(train_y) {
-            assert!(y < n_labels,
-                "labels' values must be < number of labels");
+            assert!(y < n_labels, "labels' values must be < number of labels");
             priors_count.add_example(y);
             if let Some(jx) = joint_count.get_mut(x) {
                 jx.add_example(y);
@@ -184,8 +187,7 @@ impl FrequentistEstimator {
         let mut error_count = 0;
 
         for (x, &y) in test_x.iter().zip(test_y) {
-            let jx = joint_count.get(x)
-                          .expect("shouldn't happen");
+            let jx = joint_count.get(x).expect("shouldn't happen");
 
             let pred = match jx.predict() {
                 Some(pred) => pred,
@@ -232,7 +234,6 @@ impl FrequentistEstimator {
         let x = some_or_error(self.train_x.pop())?;
         let y = some_or_error(self.train_y.pop())?;
 
-
         // Update priors and if they changed update the error count.
         let old_priors_pred = some_or_error(self.priors_count.predict())?;
         let priors_changed = self.priors_count.remove_example(y);
@@ -256,8 +257,7 @@ impl FrequentistEstimator {
         // Update joint counts (and error), but only if `x` appears
         // in the test set.
         if let Some(joint) = self.joint_count.get_mut(&x) {
-            let old_joint_pred = joint.predict()
-                                      .expect("shouldn't fail here");
+            let old_joint_pred = joint.predict().expect("shouldn't fail here");
             let joint_changed = joint.remove_example(y);
 
             if joint_changed {
@@ -292,9 +292,10 @@ impl BayesEstimator for FrequentistEstimator {
 
         let mut old_priors_pred = match self.priors_count.predict() {
             Some(pred) => pred,
-            None => { self.add_first_example(x, y);
-                      return Ok(())
-                    },
+            None => {
+                self.add_first_example(x, y);
+                return Ok(());
+            }
         };
 
         // If max prior changed, update predictions for those that were
@@ -363,8 +364,7 @@ impl BayesEstimator for FrequentistEstimator {
         for (xi, &yi) in self.test_x.iter().zip(&self.test_y) {
             let pred = if let Some(joint) = self.joint_count.get(&xi) {
                 joint.predict().unwrap()
-            }
-            else {
+            } else {
                 match self.priors_count.predict() {
                     Some(pred) => pred,
                     None => panic!("Call get_individual_errors() after training"),
@@ -392,22 +392,17 @@ impl ArrayToIndex {
     }
 
     pub fn map(&mut self, x: ArrayView1<f64>) -> ObjectValue {
-        let x = x.iter()
-                 .map(|&x| OrderedFloat::from(x))
-                 .collect::<Vec<_>>();
+        let x = x.iter().map(|&x| OrderedFloat::from(x)).collect::<Vec<_>>();
 
         let mapping = &mut self.mapping;
         let next_id = &mut self.next_id;
-        let id = mapping.entry(x).or_insert_with(|| { *next_id += 1;
-                                                      *next_id - 1});
+        let id = mapping.entry(x).or_insert_with(|| {
+            *next_id += 1;
+            *next_id - 1
+        });
         *id
     }
 }
-
-
-
-
-
 
 #[cfg(test)]
 mod tests {
@@ -422,11 +417,13 @@ mod tests {
         let test_x = array![0, 0, 1, 2, 2, 8, 8];
         let test_y = array![1, 1, 1, 1, 2, 1, 0];
 
-        let freq = FrequentistEstimator::from_data(n_labels,
-                                                   &train_x.view(),
-                                                   &train_y.view(),
-                                                   &test_x.view(),
-                                                   &test_y.view());
+        let freq = FrequentistEstimator::from_data(
+            n_labels,
+            &train_x.view(),
+            &train_y.view(),
+            &test_x.view(),
+            &test_y.view(),
+        );
 
         // Only keeps track of (unique) points that are in train_x.
         assert_eq!(freq.joint_count.len(), 4);
@@ -447,7 +444,7 @@ mod tests {
 
         //// Estimate.
         assert_eq!(freq.error_count, 3);
-        assert_eq!(freq.get_error(), 3./7.);
+        assert_eq!(freq.get_error(), 3. / 7.);
     }
 
     #[test]
@@ -459,11 +456,13 @@ mod tests {
         let test_x = array![0, 0, 1, 2, 2, 8, 8];
         let test_y = array![1, 1, 1, 1, 2, 1, 0];
 
-        let mut freq = FrequentistEstimator::from_data(n_labels,
-                                                       &train_x.view(),
-                                                       &train_y.view(),
-                                                       &test_x.view(),
-                                                       &test_y.view());
+        let mut freq = FrequentistEstimator::from_data(
+            n_labels,
+            &train_x.view(),
+            &train_y.view(),
+            &test_x.view(),
+            &test_y.view(),
+        );
 
         // Estimate.
         // 0)
@@ -490,7 +489,7 @@ mod tests {
         assert_eq!(freq.joint_count.get(&2).unwrap().predict().unwrap(), 2);
         assert_eq!(freq.priors_count.count, vec![2, 3, 4]);
         assert_eq!(freq.priors_count.predict().unwrap(), 2);
-        assert_eq!(freq.error_count, 4);    // Increases because of priors.
+        assert_eq!(freq.error_count, 4); // Increases because of priors.
 
         // 4)
         freq.remove_one().unwrap();
@@ -555,16 +554,26 @@ mod tests {
     #[test]
     fn frequentist_estimate_forward() {
         let n_labels = 3;
-        let train_x = array![[0.], [0.], [0.], [1.], [1.], [2.], [2.], [2.],
-                             [2.], [2.], [2.], [6.]];
+        let train_x = array![
+            [0.],
+            [0.],
+            [0.],
+            [1.],
+            [1.],
+            [2.],
+            [2.],
+            [2.],
+            [2.],
+            [2.],
+            [2.],
+            [6.]
+        ];
         let train_y = array![0, 1, 1, 2, 2, 1, 2, 2, 0, 1, 1, 1];
 
         let test_x = array![[0.], [0.], [1.], [2.], [2.], [8.], [8.]];
         let test_y = array![1, 1, 1, 1, 2, 1, 0];
 
-        let mut freq = FrequentistEstimator::new(n_labels,
-                                                 &test_x.view(),
-                                                 &test_y.view());
+        let mut freq = FrequentistEstimator::new(n_labels, &test_x.view(), &test_y.view());
 
         // Estimate.
         // 11)
@@ -591,7 +600,6 @@ mod tests {
         assert!(freq.joint_count.get(&1).unwrap().predict().is_none());
         assert_eq!(freq.priors_count.count, vec![1, 2, 0]);
         assert_eq!(freq.error_count, 2);
-
 
         // 8)
         freq.add_example(&train_x.row(3), train_y[3]).unwrap();
@@ -622,7 +630,7 @@ mod tests {
         let pred = freq.joint_count.get(&2).unwrap().predict().unwrap();
         // NOTE: pred could either be 2 or 1, but I'll keep the condition
         // strict so that if anything changes we know.
-        //assert!(pred == 2 || pred == 1); 
+        //assert!(pred == 2 || pred == 1);
         assert_eq!(pred, 1);
         assert_eq!(freq.priors_count.count, vec![1, 3, 3]);
         // NOTE: the following could be 3 or 4, but I'll set the condition
@@ -643,7 +651,7 @@ mod tests {
         assert_eq!(freq.joint_count.get(&2).unwrap().predict().unwrap(), 2);
         assert_eq!(freq.priors_count.count, vec![2, 3, 4]);
         assert_eq!(freq.priors_count.predict().unwrap(), 2);
-        assert_eq!(freq.error_count, 4);    // Increases because of priors.
+        assert_eq!(freq.error_count, 4); // Increases because of priors.
 
         // 2)
         freq.add_example(&train_x.row(9), train_y[9]).unwrap();

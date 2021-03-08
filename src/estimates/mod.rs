@@ -1,28 +1,28 @@
 //! This module implements Bayes risk estimates, and heuristics for
 //! evaluating convergence.
+pub mod convergence;
+pub mod frequentist;
 pub mod knn;
 pub mod knn_utils;
 pub mod nn_bound;
-pub mod frequentist;
-pub mod convergence;
 
-pub use self::knn::KNNEstimator;
-pub use self::nn_bound::NNBoundEstimator;
-pub use self::frequentist::FrequentistEstimator;
 pub use self::convergence::ForwardChecker;
+pub use self::frequentist::FrequentistEstimator;
+pub use self::knn::KNNEstimator;
 pub use self::knn_utils::*;
+pub use self::nn_bound::NNBoundEstimator;
 
 use crate::Label;
 use ndarray::prelude::*;
 
 /// Estimators that F-BLEAU currently provides.
 #[derive(Deserialize)]
-#[serde(rename_all="lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum Estimate {
     NN,
     KNN,
     Frequentist,
-    #[serde(rename="nn-bound")]
+    #[serde(rename = "nn-bound")]
     NNBound,
 }
 

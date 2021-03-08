@@ -1,16 +1,15 @@
 use ndarray::prelude::*;
 use strsim::generic_levenshtein;
 
-
 /// Computes the NN bound derived from Cover&Hart, given
 /// the error and the number of labels.
 pub fn nn_bound(error: f64, nlabels: usize) -> f64 {
     let nl = nlabels as f64;
     // Computing: (L-1)/L * (1 - (1 - L/(L-1)*error).sqrt())
     // with error = min(error, rg).
-    let rg = (nl-1.)/nl;
+    let rg = (nl - 1.) / nl;
     match error {
-        e if e < rg => rg * (1. - (1. - nl/(nl-1.)*error).sqrt()),
+        e if e < rg => rg * (1. - (1. - nl / (nl - 1.) * error).sqrt()),
         _ => rg,
     }
 }
@@ -18,10 +17,10 @@ pub fn nn_bound(error: f64, nlabels: usize) -> f64 {
 /// Returns the Euclidean distance between two vectors of f64 values.
 pub fn euclidean_distance(v1: &ArrayView1<f64>, v2: &ArrayView1<f64>) -> f64 {
     v1.iter()
-      .zip(v2.iter())
-      .map(|(x,y)| (x - y).powi(2))
-      .sum::<f64>()
-      .sqrt()
+        .zip(v2.iter())
+        .map(|(x, y)| (x - y).powi(2))
+        .sum::<f64>()
+        .sqrt()
 }
 
 /// Returns the Levenshtein distance between two vectors of f64 values.
@@ -50,14 +49,20 @@ pub fn knn_strategy(strategy: KNNStrategy) -> Box<dyn Fn(usize) -> usize> {
     match strategy {
         KNNStrategy::NN => Box::new(move |_| 1),
         KNNStrategy::FixedK(k) => Box::new(move |_| k),
-        KNNStrategy::Ln => Box::new(move |n|
-                                    next_odd(if n != 0 {
-                                                (n as f64).ln().ceil() as usize
-                                             } else { 1 })),
-        KNNStrategy::Log10 => Box::new(move |n|
-                                    next_odd(if n != 0 {
-                                                (n as f64).log10().ceil() as usize
-                                             } else { 1 })),
+        KNNStrategy::Ln => Box::new(move |n| {
+            next_odd(if n != 0 {
+                (n as f64).ln().ceil() as usize
+            } else {
+                1
+            })
+        }),
+        KNNStrategy::Log10 => Box::new(move |n| {
+            next_odd(if n != 0 {
+                (n as f64).log10().ceil() as usize
+            } else {
+                1
+            })
+        }),
         KNNStrategy::Custom(custom) => custom,
     }
 }

@@ -33,21 +33,21 @@ extern crate csv;
 extern crate ndarray;
 #[macro_use]
 extern crate itertools;
-extern crate ordered_float;
 extern crate float_cmp;
+extern crate ordered_float;
 #[macro_use]
 extern crate serde;
-extern crate strsim;
-#[cfg(feature="python-module")]
-extern crate pyo3;
-#[cfg(feature="python-module")]
+#[cfg(feature = "python-module")]
 extern crate numpy;
+#[cfg(feature = "python-module")]
+extern crate pyo3;
+extern crate strsim;
 
 pub mod estimates;
 pub mod fbleau_estimation;
+#[cfg(feature = "python-module")]
+pub mod python_module;
 pub mod security_measures;
 pub mod utils;
-#[cfg(feature="python-module")]
-pub mod python_module;
 
 pub type Label = usize;

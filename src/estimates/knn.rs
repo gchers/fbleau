@@ -36,7 +36,7 @@
 //!                     [5.]];
 //! let test_y = array![0, 0, 2, 1, 0, 1, 0];
 //! let max_n = train_x.nrows();
-//! 
+//!
 //! let k = 3;
 //! let mut knn = KNNEstimator::from_data(&train_x.view(), &train_y.view(),
 //!                             &test_x.view(), &test_y.view(), max_n,
@@ -56,15 +56,15 @@
 //! assert_eq!(knn.get_error(), 0.42857142857142855);
 //! # }
 //! ```
-use std;
-use ndarray::*;
-use std::collections::HashMap;
-use ordered_float::OrderedFloat;
-use std::cmp::Ordering;
 use float_cmp::approx_eq;
+use ndarray::*;
+use ordered_float::OrderedFloat;
+use std;
+use std::cmp::Ordering;
+use std::collections::HashMap;
 
+use crate::estimates::{knn_strategy, BayesEstimator, KNNStrategy};
 use crate::Label;
-use crate::estimates::{BayesEstimator,KNNStrategy,knn_strategy};
 
 /// Nearest neighbors to a test object.
 #[derive(Debug)]
@@ -78,10 +78,7 @@ struct Neighbor {
 impl Neighbor {
     /// Constructs a new Neighbor.
     fn new(distance: f64, label: Label) -> Neighbor {
-        Neighbor {
-            distance,
-            label,
-        }
+        Neighbor { distance, label }
     }
 }
 
@@ -109,11 +106,12 @@ impl PartialEq for Neighbor {
 
 impl Eq for Neighbor {}
 
-
 /// Contains the nearest neighbors of some test object x.
 #[derive(Debug)]
 struct NearestNeighbors<D>
-where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
+where
+    D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64,
+{
     // Test object x.
     x: Array1<f64>,
     // List of neighbors, sorted in increasing order by their distance
@@ -139,7 +137,9 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
 }
 
 impl<D> NearestNeighbors<D>
-where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
+where
+    D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy,
+{
     /// Init a list of neighbors for a specified test object x.
     fn new(x: &ArrayView1<f64>, max_k: usize, distance: D) -> NearestNeighbors<D> {
         NearestNeighbors {
@@ -164,8 +164,13 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
     /// * `train_y` - Training labels.
     /// * `max_k` - Maximum number of neighbors to store for test object x.
     ///
-    fn from_data(x: &ArrayView1<f64>, train_x: &ArrayView2<f64>,
-                 train_y: &ArrayView1<Label>, max_k: usize, distance: D) -> NearestNeighbors<D> {
+    fn from_data(
+        x: &ArrayView1<f64>,
+        train_x: &ArrayView2<f64>,
+        train_y: &ArrayView1<Label>,
+        max_k: usize,
+        distance: D,
+    ) -> NearestNeighbors<D> {
         assert!(max_k > 0);
 
         let mut knn = NearestNeighbors::new(x, max_k, distance);
@@ -174,8 +179,11 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
             // NOTE: we use std::usize::MAX as a bogus label to split ties in
             // predict(); if this becomes a problem, predict() needs to be
             // fixed as well.
-            assert!(*yi != std::usize::MAX,
-                    "label {} is too large and currently not supported", *yi);
+            assert!(
+                *yi != std::usize::MAX,
+                "label {} is too large and currently not supported",
+                *yi
+            );
 
             knn.add_example(&xi, *yi);
         }
@@ -217,7 +225,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
 
         // If the k-th element does not exist or has distance larger
         // than the (k-1)-th element then we don't split ties.
-        let ties_d = self.neighbors[k-1].distance;
+        let ties_d = self.neighbors[k - 1].distance;
         let no_ties = (self.neighbors.len() <= k) || (self.neighbors[k].distance > ties_d);
         // Do self.extra_ties play a part in this prediction?
         let extra_ties_matter = !self.extra_ties.is_empty() && (k == self.neighbors.len());
@@ -255,8 +263,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
                     y_pred = neigh.label;
                     y_count = *count;
                 }
-            }
-            else {
+            } else {
                 // Count labels within ties.
                 let count = ties_label_count.entry(neigh.label).or_insert(0);
                 *count += 1;
@@ -297,10 +304,10 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
         // count which is the most frequent overall.
         if y_pred == TIES_LABEL {
             y_pred = ties_y_pred;
-        }
-        else {
-            let mut count = *label_count.get(&TIES_LABEL)
-                                    .expect("[!] unexpected error in splitting ties");
+        } else {
+            let mut count = *label_count
+                .get(&TIES_LABEL)
+                .expect("[!] unexpected error in splitting ties");
             if let Some(c) = label_count.get(&ties_y_pred) {
                 count += c;
             }
@@ -316,15 +323,17 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
     /// Returns the index of the first neighbor with the same distance as
     /// self.neighbors[i].
     fn first_of_ties(&self, mut i: usize) -> usize {
-        if i == 0  || self.neighbors.is_empty() {
+        if i == 0 || self.neighbors.is_empty() {
             return 0;
         }
 
-        let d = self.neighbors.get(i)
-                              .expect("first_of_ties() called on wrong index")
-                              .distance;
+        let d = self
+            .neighbors
+            .get(i)
+            .expect("first_of_ties() called on wrong index")
+            .distance;
 
-        while let Some(neigh) = self.neighbors.get(i-1) {
+        while let Some(neigh) = self.neighbors.get(i - 1) {
             if !approx_eq!(f64, neigh.distance, d) {
                 break;
             }
@@ -348,12 +357,9 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
 
             // Update updated_k with ties.
             self.updated_k = self.first_of_ties(pos);
-
-        }
-        else if self.neighbors.last().unwrap().distance < d {
+        } else if self.neighbors.last().unwrap().distance < d {
             return false;
-        }
-        else if approx_eq!(f64, self.neighbors.last().unwrap().distance, d) {
+        } else if approx_eq!(f64, self.neighbors.last().unwrap().distance, d) {
             // Handle ties.
             if self.extra_ties.is_empty() {
                 self.extra_ties_dist = Some(d);
@@ -365,9 +371,8 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
             }
 
             // Update updated_k with ties.
-            self.updated_k = self.first_of_ties(self.neighbors.len()-1);
-        }
-        else {
+            self.updated_k = self.first_of_ties(self.neighbors.len() - 1);
+        } else {
             // Insert sorted.
             let new = Neighbor::new(d, y);
             let pos = self.neighbors.binary_search(&new).unwrap_or_else(|e| e);
@@ -383,16 +388,14 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
                     //self.ties.push(removed);
                     if self.extra_ties.is_empty() {
                         self.extra_ties_dist = Some(removed.distance);
-                    }
-                    else {
+                    } else {
                         // TODO: could remove this check if we're sure it is
                         // updated elsewhere correctly.
                         assert_eq!(Some(removed.distance), self.extra_ties_dist);
                     }
                     let count = self.extra_ties.entry(removed.label).or_insert(0);
                     *count += 1;
-                }
-                else {
+                } else {
                     self.extra_ties.clear();
                     self.extra_ties_dist = None;
                 }
@@ -402,12 +405,13 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Copy {
     }
 }
 
-
 /// Keeps track of the error of a k-NN classifier, with the possibility
 /// of changing k and removing training examples.
 pub struct KNNEstimator<D>
-where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
-      //K: Fn(usize) -> usize {
+where
+    D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64,
+{
+    //K: Fn(usize) -> usize {
     // max_k nearest neighbors for each test object.
     neighbors: Vec<NearestNeighbors<D>>,
     // Error for each test object.
@@ -433,11 +437,17 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 {
 }
 
 impl<D> KNNEstimator<D>
-where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
+where
+    D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy,
+{
     /// Create a new k-NN estimator.
-    pub fn new(test_x: &ArrayView2<f64>, test_y: &ArrayView1<Label>,
-               max_n: usize, distance: D, strategy: KNNStrategy)
-            -> KNNEstimator<D> {
+    pub fn new(
+        test_x: &ArrayView2<f64>,
+        test_y: &ArrayView1<Label>,
+        max_n: usize,
+        distance: D,
+        strategy: KNNStrategy,
+    ) -> KNNEstimator<D> {
         assert_eq!(test_x.nrows(), test_y.len());
         assert!(!test_y.is_empty());
 
@@ -449,18 +459,20 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         // results once we've seen all the training data.
         let max_k = k_from_n(max_n);
 
-        let neighbors = test_x.outer_iter()
-                              .map(|x| NearestNeighbors::new(&x, max_k, distance))
-                              .collect::<Vec<_>>();
+        let neighbors = test_x
+            .outer_iter()
+            .map(|x| NearestNeighbors::new(&x, max_k, distance))
+            .collect::<Vec<_>>();
         // We initially set all predictions to 0. Therefore, we need to
         // adjust the error count accordingly. Note that this is updated as
         // soon as add_example() is called.
         // A more proper way to do this in Rust would be to set
         // predictions (and errors, k_error_count, ...) to an Option value.
         // TODO: should we?
-        let errors = test_y.iter()
-                           .map(|y| if *y != 0 { 1 } else { 0 })
-                           .collect::<Vec<_>>();
+        let errors = test_y
+            .iter()
+            .map(|y| if *y != 0 { 1 } else { 0 })
+            .collect::<Vec<_>>();
         let error_count = errors.iter().sum();
 
         KNNEstimator {
@@ -476,10 +488,15 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     }
 
     /// Create a k-NN estimator from training and test set.
-    pub fn from_data(train_x: &ArrayView2<f64>, train_y: &ArrayView1<Label>,
-            test_x: &ArrayView2<f64>, test_y: &ArrayView1<Label>,
-            max_n: usize, distance: D, strategy: KNNStrategy)
-            -> KNNEstimator<D> {
+    pub fn from_data(
+        train_x: &ArrayView2<f64>,
+        train_y: &ArrayView1<Label>,
+        test_x: &ArrayView2<f64>,
+        test_y: &ArrayView1<Label>,
+        max_n: usize,
+        distance: D,
+        strategy: KNNStrategy,
+    ) -> KNNEstimator<D> {
         assert_eq!(train_x.ncols(), test_x.ncols());
         assert_eq!(train_x.nrows(), train_y.len());
         assert_eq!(test_x.nrows(), test_y.len());
@@ -491,13 +508,12 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         // Maximum number of neighbors to store (excluding ties).
         let max_k = k_from_n(max_n);
 
-        let neighbors = test_x.outer_iter()
-                            .map(|x| NearestNeighbors::from_data(&x,
-                                                           &train_x.view(),
-                                                           &train_y.view(),
-                                                           max_k,
-                                                           distance))
-                            .collect::<Vec<_>>();
+        let neighbors = test_x
+            .outer_iter()
+            .map(|x| {
+                NearestNeighbors::from_data(&x, &train_x.view(), &train_y.view(), max_k, distance)
+            })
+            .collect::<Vec<_>>();
 
         let n = train_y.len();
         let k = k_from_n(n);
@@ -506,8 +522,7 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         let mut predictions = Vec::with_capacity(test_y.len());
 
         for (neigh, y) in neighbors.iter().zip(test_y) {
-            let pred = neigh.predict(k)
-                            .expect("unexpected error");
+            let pred = neigh.predict(k).expect("unexpected error");
             let error = if pred != *y { 1 } else { 0 };
 
             predictions.push(pred);
@@ -531,10 +546,12 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
     ///
     /// Called when when k changes.
     fn update_all(&mut self) -> Result<(), ()> {
-
-        for (neigh, y, old_pred, old_error) in
-                izip!(&self.neighbors, &self.labels,
-                      &mut self.predictions, &mut self.errors) {
+        for (neigh, y, old_pred, old_error) in izip!(
+            &self.neighbors,
+            &self.labels,
+            &mut self.predictions,
+            &mut self.errors
+        ) {
             let pred = neigh.predict(self.current_k)?;
             if pred == *old_pred {
                 continue;
@@ -542,10 +559,10 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
             let error = if pred != *y { 1 } else { 0 };
 
             match (error, *old_error) {
-                (1, 0) => { self.k_error_count += 1 },
-                (0, 1) => { self.k_error_count -= 1 },
+                (1, 0) => self.k_error_count += 1,
+                (0, 1) => self.k_error_count -= 1,
                 // No need to update.
-                _ => {},
+                _ => {}
             };
 
             *old_pred = pred;
@@ -565,7 +582,9 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
 }
 
 impl<D> BayesEstimator for KNNEstimator<D>
-where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
+where
+    D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy,
+{
     /// Adds a new example to the k-NN estimator's training data.
     ///
     /// This also updates the prediction, if necessary.
@@ -578,9 +597,12 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
         let current_k = self.current_k;
 
         // Update errors and neighbors as appropriate.
-        for (neigh, true_y, old_pred, old_error) in
-                izip!(&mut self.neighbors, &self.labels,
-                      &mut self.predictions, &mut self.errors) {
+        for (neigh, true_y, old_pred, old_error) in izip!(
+            &mut self.neighbors,
+            &self.labels,
+            &mut self.predictions,
+            &mut self.errors
+        ) {
             if neigh.add_example(x, y) {
                 if neigh.updated_k > current_k {
                     continue;
@@ -598,12 +620,12 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
                 *old_pred = pred;
 
                 match (error, *old_error) {
-                    (1, 0) => { self.k_error_count += 1 },
-                    (0, 1) => { self.k_error_count -= 1 },
+                    (1, 0) => self.k_error_count += 1,
+                    (0, 1) => self.k_error_count -= 1,
                     // No need to update. Note that we do not need
                     // to set *old_error = error either, as they're
                     // also the same. So we can return now.
-                    _ => { continue },
+                    _ => continue,
                 };
 
                 *old_error = error;
@@ -625,16 +647,16 @@ where D: Fn(&ArrayView1<f64>, &ArrayView1<f64>) -> f64 + Send + Sync + Copy {
 
     /// Returns the current errors for each test point.
     fn get_individual_errors(&self) -> Vec<bool> {
-        self.errors.iter()
-                   .map(|e| match e {
-                            0 => false,
-                            1 => true,
-                            _ => panic!("{}", "errors must contain values in {0,1}")
-                            })
-                   .collect::<Vec<_>>()
+        self.errors
+            .iter()
+            .map(|e| match e {
+                0 => false,
+                1 => true,
+                _ => panic!("{}", "errors must contain values in {0,1}"),
+            })
+            .collect::<Vec<_>>()
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -643,36 +665,33 @@ mod tests {
 
     #[test]
     fn knn_init() {
-        let train_x = array![[8.],
-                             [3.],
-                             [1.],
-                             [4.],
-                             [5.],
-                             [7.],
-                             [2.],
-                             [6.]];
+        let train_x = array![[8.], [3.], [1.], [4.], [5.], [7.], [2.], [6.]];
         let train_y = array![0, 0, 0, 1, 0, 1, 1, 2];
         let x = array![0.];
         let mut max_k = 8;
-        
-        let knn = NearestNeighbors::from_data(&x.view(), &train_x.view(),
-                                        &train_y.view(), max_k,
-                                        euclidean_distance);
-        
-        let distances_from_x: Vec<_> = knn.neighbors.iter()
-                                            .map(|neigh| neigh.distance)
-                                            .collect();
+
+        let knn = NearestNeighbors::from_data(
+            &x.view(),
+            &train_x.view(),
+            &train_y.view(),
+            max_k,
+            euclidean_distance,
+        );
+
+        let distances_from_x: Vec<_> = knn.neighbors.iter().map(|neigh| neigh.distance).collect();
         assert_eq!(distances_from_x, vec![1., 2., 3., 4., 5., 6., 7., 8.]);
 
         // Reduce max_k.
         max_k = 5;
-        let knn = NearestNeighbors::from_data(&x.view(), &train_x.view(),
-                                        &train_y.view(), max_k,
-                                        euclidean_distance);
-        
-        let distances_from_x: Vec<_> = knn.neighbors.iter()
-                                            .map(|neigh| neigh.distance)
-                                            .collect();
+        let knn = NearestNeighbors::from_data(
+            &x.view(),
+            &train_x.view(),
+            &train_y.view(),
+            max_k,
+            euclidean_distance,
+        );
+
+        let distances_from_x: Vec<_> = knn.neighbors.iter().map(|neigh| neigh.distance).collect();
         assert_eq!(distances_from_x, vec![1., 2., 3., 4., 5.]);
     }
 
@@ -684,9 +703,13 @@ mod tests {
         let x = array![0.];
         let max_k = 10;
 
-        let knn = NearestNeighbors::from_data(&x.view(), &train_x.view(),
-                                        &train_y.view(), max_k,
-                                        euclidean_distance);
+        let knn = NearestNeighbors::from_data(
+            &x.view(),
+            &train_x.view(),
+            &train_y.view(),
+            max_k,
+            euclidean_distance,
+        );
 
         assert_eq!(knn.predict(1), Ok(0));
         assert_eq!(knn.predict(3), Ok(1));
@@ -697,26 +720,30 @@ mod tests {
         let train_x = array![[1.], [1.], [1.], [1.], [1.], [1.], [2.], [2.], [0.]];
         let train_y = array![0, 1, 1, 1, 0, 1, 0, 0, 0];
 
-        let knn = NearestNeighbors::from_data(&x.view(), &train_x.view(),
-                                        &train_y.view(), max_k,
-                                        euclidean_distance);
+        let knn = NearestNeighbors::from_data(
+            &x.view(),
+            &train_x.view(),
+            &train_y.view(),
+            max_k,
+            euclidean_distance,
+        );
 
         assert_eq!(knn.predict(1), Ok(0));
         assert_eq!(knn.predict(3), Ok(1));
         assert_eq!(knn.predict(5), Ok(1));
-
     }
 
     #[test]
     fn knn_predictions_multivariate() {
-
-        let train_x = array![[1., 3.],
-                             [1., 2.],
-                             [2., 3.],
-                             [2., 2.],
-                             [3., 2.],
-                             [2., 2.],
-                             [2., 2.]];
+        let train_x = array![
+            [1., 3.],
+            [1., 2.],
+            [2., 3.],
+            [2., 2.],
+            [3., 2.],
+            [2., 2.],
+            [2., 2.]
+        ];
         let train_y = array![0, 0, 0, 1, 1, 2, 2];
 
         let x1 = array![2., 2.];
@@ -725,12 +752,20 @@ mod tests {
         let max_k = 10;
         let distance = euclidean_distance;
 
-        let mut knn1 = NearestNeighbors::from_data(&x1.view(), &train_x.view(),
-                                                   &train_y.view(), max_k,
-                                                   distance);
-        let knn2 = NearestNeighbors::from_data(&x2.view(), &train_x.view(),
-                                              &train_y.view(), max_k,
-                                              distance);
+        let mut knn1 = NearestNeighbors::from_data(
+            &x1.view(),
+            &train_x.view(),
+            &train_y.view(),
+            max_k,
+            distance,
+        );
+        let knn2 = NearestNeighbors::from_data(
+            &x2.view(),
+            &train_x.view(),
+            &train_y.view(),
+            max_k,
+            distance,
+        );
 
         assert_eq!(knn1.predict(1), Ok(2));
 
@@ -747,14 +782,7 @@ mod tests {
 
     #[test]
     fn knn_forward_predictions() {
-        let train_x = array![[8.],
-                             [7.],
-                             [6.],
-                             [5.],
-                             [4.],
-                             [3.],
-                             [2.],
-                             [1.]];
+        let train_x = array![[8.], [7.], [6.], [5.], [4.], [3.], [2.], [1.]];
         let train_y = array![0, 0, 0, 1, 0, 1, 1, 2];
         let x = array![0.];
         let max_k = 8;
@@ -763,15 +791,28 @@ mod tests {
         // NNs of x.
         let mut knn = NearestNeighbors::new(&x.view(), max_k, distance);
 
-
-        let expected_preds_1 = vec![Ok(0), Ok(0), Ok(0), Ok(1), Ok(0), Ok(1),
-                                    Ok(1), Ok(2)];
-        let expected_preds_3 = vec![Err(()), Err(()), Ok(0), Ok(0), Ok(0),
-                                    Ok(1), Ok(1), Ok(1)];
-        let expected_preds_5 = vec![Err(()), Err(()), Err(()), Err(()), Ok(0),
-                                    Ok(0), Ok(1), Ok(1)];
-        let expected_preds_7 = vec![Err(()), Err(()), Err(()), Err(()),
-                                    Err(()), Err(()), Ok(0), Ok(1)];
+        let expected_preds_1 = vec![Ok(0), Ok(0), Ok(0), Ok(1), Ok(0), Ok(1), Ok(1), Ok(2)];
+        let expected_preds_3 = vec![Err(()), Err(()), Ok(0), Ok(0), Ok(0), Ok(1), Ok(1), Ok(1)];
+        let expected_preds_5 = vec![
+            Err(()),
+            Err(()),
+            Err(()),
+            Err(()),
+            Ok(0),
+            Ok(0),
+            Ok(1),
+            Ok(1),
+        ];
+        let expected_preds_7 = vec![
+            Err(()),
+            Err(()),
+            Err(()),
+            Err(()),
+            Err(()),
+            Err(()),
+            Ok(0),
+            Ok(1),
+        ];
 
         for (i, (x, y)) in train_x.outer_iter().zip(train_y.iter()).enumerate() {
             knn.add_example(&x, *y);
@@ -784,52 +825,58 @@ mod tests {
 
     #[test]
     fn knn_forward_errors() {
-        let train_x = array![[8.],
-                             [7.],
-                             [6.],
-                             [5.],
-                             [4.],
-                             [3.],
-                             [2.],
-                             [1.]];
+        let train_x = array![[8.], [7.], [6.], [5.], [4.], [3.], [2.], [1.]];
         let train_y = array![0, 0, 0, 1, 0, 1, 1, 2];
-        let test_x = array![[3.],
-                            [0.],
-                            [6.],
-                            [1.],
-                            [6.],
-                            [4.],
-                            [5.]];
+        let test_x = array![[3.], [0.], [6.], [1.], [6.], [4.], [5.]];
         let test_y = array![0, 0, 2, 1, 0, 1, 0];
         let max_n = train_x.nrows();
         let distance = euclidean_distance;
 
         // Test for k = 1.
-        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(),
-                                        max_n, distance, KNNStrategy::NN);
+        let mut knn = KNNEstimator::new(
+            &test_x.view(),
+            &test_y.view(),
+            max_n,
+            distance,
+            KNNStrategy::NN,
+        );
 
         // FIXME: I'm not sure why in this case, differently from the
         // backward test, I need to include one more error and prediction.
         // The rest is exactly identical.
-        let expected_preds = vec![[1, 2, 0, 2, 0, 0, 1],
-                                  [1, 1, 0, 1, 0, 0, 1],
-                                  [1, 1, 0, 1, 0, 0, 1],
-                                  [0, 0, 0, 0, 0, 0, 1],
-                                  [1, 1, 0, 1, 0, 1, 1],
-                                  [0, 0, 0, 0, 0, 0, 0],
-                                  [0, 0, 0, 0, 0, 0, 0],
-                                  [0, 0, 0, 0, 0, 0, 0]];
-        let expected_error = vec![0.8571428571428571, 0.7142857142857143,
-                                  0.7142857142857143, 0.5714285714285714,
-                                  0.5714285714285714, 0.42857142857142855,
-                                  0.42857142857142855, 0.42857142857142855];
+        let expected_preds = vec![
+            [1, 2, 0, 2, 0, 0, 1],
+            [1, 1, 0, 1, 0, 0, 1],
+            [1, 1, 0, 1, 0, 0, 1],
+            [0, 0, 0, 0, 0, 0, 1],
+            [1, 1, 0, 1, 0, 1, 1],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+        ];
+        let expected_error = vec![
+            0.8571428571428571,
+            0.7142857142857143,
+            0.7142857142857143,
+            0.5714285714285714,
+            0.5714285714285714,
+            0.42857142857142855,
+            0.42857142857142855,
+            0.42857142857142855,
+        ];
         // NOTE: expected_error correspond to the following error counts:
         // [6, 5, 5, 4, 4, 3, 3]
 
         for (i, (x, y)) in train_x.outer_iter().zip(train_y.iter()).enumerate() {
             knn.add_example(&x, *y).unwrap();
-            assert_eq!(knn.predictions, expected_preds[expected_preds.len()-1-i]);
-            assert_eq!(knn.get_error(), expected_error[expected_error.len()-1-i]);
+            assert_eq!(
+                knn.predictions,
+                expected_preds[expected_preds.len() - 1 - i]
+            );
+            assert_eq!(
+                knn.get_error(),
+                expected_error[expected_error.len() - 1 - i]
+            );
         }
 
         // Test when changing k.
@@ -840,22 +887,36 @@ mod tests {
             4..=6 => 4,
             _ => 5,
         });
-        let mut knn = KNNEstimator::new(&test_x.view(), &test_y.view(),
-                                        max_n, distance,
-                                        KNNStrategy::Custom(k_from_n));
-        let expected_error = vec![0.42857142857142855, 0.42857142857142855,
-                                  0.42857142857142855, 0.5714285714285714,
-                                  0.42857142857142855, 0.42857142857142855,
-                                  0.42857142857142855, 0.42857142857142855];
-        let expected_preds = vec![vec![0; 7], vec![0; 7], vec![0; 7],
-                                  //NOTE: the prediction vector right
-                                  //below this comment may also be
-                                  //vec![1, 1, 1, 1, 0, 1, 0].
-                                  vec![1, 1, 0, 1, 0, 1, 1],
-                                  vec![0; 7],
-                                  vec![1, 1, 0, 1, 0, 1, 0],
-                                  vec![1, 1, 0, 1, 0, 1, 0],
-                                  vec![1, 1, 0, 1, 0, 1, 0]];
+        let mut knn = KNNEstimator::new(
+            &test_x.view(),
+            &test_y.view(),
+            max_n,
+            distance,
+            KNNStrategy::Custom(k_from_n),
+        );
+        let expected_error = vec![
+            0.42857142857142855,
+            0.42857142857142855,
+            0.42857142857142855,
+            0.5714285714285714,
+            0.42857142857142855,
+            0.42857142857142855,
+            0.42857142857142855,
+            0.42857142857142855,
+        ];
+        let expected_preds = vec![
+            vec![0; 7],
+            vec![0; 7],
+            vec![0; 7],
+            //NOTE: the prediction vector right
+            //below this comment may also be
+            //vec![1, 1, 1, 1, 0, 1, 0].
+            vec![1, 1, 0, 1, 0, 1, 1],
+            vec![0; 7],
+            vec![1, 1, 0, 1, 0, 1, 0],
+            vec![1, 1, 0, 1, 0, 1, 0],
+            vec![1, 1, 0, 1, 0, 1, 0],
+        ];
         let ks = vec![1, 1, 1, 1, 3, 3, 5, 5];
 
         for (i, (x, y)) in train_x.outer_iter().zip(train_y.iter()).enumerate() {
@@ -875,12 +936,14 @@ mod tests {
         let train_y = array![0, 1, 1, 1, 0, 0, 0, 0, 1];
 
         let x = array![0.];
-        let mut nn = NearestNeighbors::from_data(&x.view(), &train_x.view(),
-                                                 &train_y.view(), max_k,
-                                                 distance);
-        let distances_from_x: Vec<_> = nn.neighbors.iter()
-                                            .map(|neigh| neigh.distance)
-                                            .collect();
+        let mut nn = NearestNeighbors::from_data(
+            &x.view(),
+            &train_x.view(),
+            &train_y.view(),
+            max_k,
+            distance,
+        );
+        let distances_from_x: Vec<_> = nn.neighbors.iter().map(|neigh| neigh.distance).collect();
         assert_eq!(distances_from_x, vec![0., 0., 0., 0., 1.]);
         assert_eq!(nn.extra_ties_dist, Some(1.));
         println!("{:?}", nn.extra_ties);
@@ -907,9 +970,13 @@ mod tests {
 
         // Different labels.
         let train_y = array![0, 0, 1, 1, 0, 0, 0, 0, 1];
-        let nn = NearestNeighbors::from_data(&x.view(), &train_x.view(),
-                                             &train_y.view(), max_k,
-                                             euclidean_distance);
+        let nn = NearestNeighbors::from_data(
+            &x.view(),
+            &train_x.view(),
+            &train_y.view(),
+            max_k,
+            euclidean_distance,
+        );
         assert_eq!(nn.predict(5).unwrap(), 0);
     }
 
