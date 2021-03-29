@@ -1,19 +1,50 @@
 # F-BLEAU <br><img src="https://github.com/gchers/fbleau/raw/gh-pages/img/forest.png" width="150" height="150" />
 [![build](https://github.com/gchers/fbleau/actions/workflows/build.yml/badge.svg)](https://github.com/gchers/fbleau/actions/workflows/build.yml) ![Version](https://img.shields.io/crates/v/fbleau.svg)
 
-F-BLEAU is a tool for estimating the leakage of a system about its secrets in
-a black-box manner (i.e., by only looking at examples of secret inputs and
-respective outputs). It considers a generic system as a black-box, taking
+F-BLEAU is a tool for estimating the information leakage of a (black-box) system,
+by only looking at examples of secret inputs and
+respective outputs. It considers a generic system as a black-box, taking
 secret inputs and returning outputs accordingly, and it measures how much the
-outputs "leak" about the inputs. It was proposed in [2].
+outputs "leak" about the inputs.
 
 F-BLEAU is based on the equivalence between estimating the error of a Machine
-Learning model of a specific class and the estimation of information leakage
-[1,2,3].
+Learning model of a specific class and the estimation of information leakage.
 
-This code was also used for the experiments of [2] on the following
+This code was used for the experiments of [2] on the following
 evaluations: Gowalla, e-passport, and side channel attack to finite field
 exponentiation.
+
+## Implemented methods
+
+We use the fact that any universally consistent (UC) Machine Learning rule
+can be used as an information leakage estimator.
+This applies to virtually any system (channel): probabilistic/deterministic, and
+with discrete/continuous secret inputs and outputs [2,4].
+
+The channel has to be stateless (i.e., it shouldn't change over time).
+For example, if evaluating a privacy mechanism that adds random noise to
+the input signal, this means that the distribution of the noise stays the same.
+
+There are *a lot* of UC rules that we can use. These are the main ones (that we're aware of):
+
+| Method | Type | Input domain | Output domain | Proposed in | Implemented in F-BLEAU  |
+| ------------- |:----:|:----:|:----:|:----:|:----:|
+| Frequentist | Estimate | Discrete | Discrete | [5] | :heavy_check_mark: |
+| NN-bound | Lower bound | Discrete | Discrete/Continuous | [1] | :heavy_check_mark: |
+| k-NN | Estimate | Discrete | Discrete/Continuous | [1] | :x: |
+| NN* | Estimate | Discrete | Discrete | [2] | :heavy_check_mark: | :x: |
+| k-NN* | Estimate | Discrete | Discrete/Continuous | [2] | :heavy_check_mark: |
+| SVM | Estimate | Discrete | Discrete/Continuous | [4] | :x:|
+| Feed-forward Neural Network | Estimate | Discrete | Discrete/Continuous | [4] | :x: |
+| k-NN regressor | Estimate | Discrete/Continuous | Discrete/Continuous | [4] | :x: |
+
+
+*: (k-)NN methods implemented in F-BLEAU are the optimised algorithms proposed in [2]; they
+are obtained by extending the Frequentist method in the spirit of the k-NN principle.
+
+Please, do feel free to make a PR with implementations of more methods, or open a ticket
+with the methods you'd like to see implemented.
+
 
 # Getting started
 
@@ -269,6 +300,7 @@ Currently, the code provided here:
 
 - [x] return various leakage measures (instead of just R*)
 - [ ] resubstitution estimate
+- [ ] continuous input (k-NN regressor)
 
 ### Mid term
 
@@ -306,3 +338,7 @@ maturin build --cargo-extra-args="--features python-module"
 [2] 2018, "F-BLEAU: Fast Black-Box Leakage Estimation". _Giovanni Cherubin, Konstantinos Chatzikokolakis, Catuscia Palamidessi_.
 
 [3] (Blog) "Machine Learning methods for Quantifying the Security of Black-boxes". https://giocher.com/pages/bayes.html
+
+[4] (PhD thesis) "Black-box SecurityMeasuring Black-box Information Leakage via Machine Learning". https://pure.royalholloway.ac.uk/portal/files/33806285/thesis_final_after_amendments.pdf
+
+[5] "Statistical measurement of information leakage", 2010. Konstantinos Chatzikokolakis, Tom Chothia, Apratim Guha. 
