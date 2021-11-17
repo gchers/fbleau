@@ -2,9 +2,9 @@ name: build
 
 on:
   push:
-    branches: [ master ]
+    branches: [ fix-build ]
   pull_request:
-    branches: [ master ]
+    branches: [ fix-build ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -24,15 +24,3 @@ jobs:
       run: |
         cargo test --verbose
         cargo clean
-  build-python:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        python-version: ['2.7', '3.7', '3.8']
-    steps:
-      - uses: actions/checkout@v2
-      - name: "Build"
-        run: |
-          pip install --upgrade --user pip maturin
-          $(python -m site --user-base)/bin/maturin build --cargo-extra-args="--features python-module"
