@@ -252,6 +252,13 @@ The function `run_fbleau()` returns a dictionary, containing:
   the individual errors (`true` if error, `false` otherwise) for each test object, corresponding to
   the best (i.e., smallest) estimate
 
+**Important note** by using `min-estimate`, you will obtain a positively
+biased estimator; that is, you will be evaluating a slightly stronger adversary.
+This is generally good when evaluating the robustness of defences.
+However, if you do not want a biased estimator, you should use
+`last-estimate`, which corresponds to training the UC method on the
+entire training set.
+
 ## Example
 
 Simple example, using the example data provided in `examples/`.
