@@ -29,10 +29,10 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python-version: ['2.7', '3.7', '3.8']
+        python-version: ['3.7', '3.8']
     steps:
       - uses: actions/checkout@v2
       - name: "Build"
         run: |
-          pip3 install --upgrade --user pip3 maturin
+          pip3 install --user maturin
           $(python3 -m site --user-base)/bin/maturin build --cargo-extra-args="--features python-module"
