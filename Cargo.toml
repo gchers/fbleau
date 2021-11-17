@@ -31,7 +31,7 @@ csv = "1.1"
 ordered-float = "2.0"
 float-cmp = "0.8"
 strsim = "0.10.0"
-ndarray = "0.14.0"
+ndarray = "0.15"
 pyo3 = { version = "0.13.2", features = ["extension-module"], optional = true }
 numpy = { version = "0.13", optional = true }
 
